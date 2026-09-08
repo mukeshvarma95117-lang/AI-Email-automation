@@ -21,7 +21,9 @@ backend/database/*.db*
 .env.development.local
 .env.test.local
 .env.production.local
-*.env*
+*.env
+.env.*
+!.env.example
 
 # Logs
 logs/
