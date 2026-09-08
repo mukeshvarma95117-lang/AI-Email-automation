@@ -39,9 +39,34 @@ function handleMockFallback(endpoint, options = {}) {
         failedMessages: 0
       },
       channels: { email: 210, whatsapp: 98, sms: 40 },
-      recentMessages: [
-        { id: 1, channel: 'email', subject: 'Product Update Q3', recipients_count: 24, status: 'sent', created_at: new Date().toISOString() },
-        { id: 2, channel: 'whatsapp', subject: 'Exclusive VIP Offer', recipients_count: 12, status: 'sent', created_at: new Date(Date.now() - 3600000).toISOString() }
+      groupSummary: [
+        { id: 1, name: 'VIP Clients', color: '#6366F1', contact_count: 58 },
+        { id: 2, name: 'Product Beta', color: '#10B981', contact_count: 42 },
+        { id: 3, name: 'Student Cohort', color: '#F59E0B', contact_count: 24 }
+      ],
+      recentActivities: [
+        {
+          id: 1,
+          channel: 'email',
+          contact_name: 'Mukesh Varma',
+          contact_target: 'mukeshvarma95117@gmail.com',
+          rendered_subject: 'Welcome to SmartSend AI GenAI 2.0',
+          rendered_body: 'Hi Mukesh, your automated messaging workspace is now fully active.',
+          status: 'delivered',
+          delivery_timestamp: new Date().toISOString(),
+          is_demo: 1
+        },
+        {
+          id: 2,
+          channel: 'whatsapp',
+          contact_name: 'Alex Johnson',
+          contact_target: '+1 415 555 2671',
+          rendered_subject: 'Exclusive VIP Offer',
+          rendered_body: 'Hi Alex, here is your exclusive workshop invitation details.',
+          status: 'delivered',
+          delivery_timestamp: new Date(Date.now() - 3600000).toISOString(),
+          is_demo: 1
+        }
       ]
     };
   }
@@ -55,9 +80,9 @@ function handleMockFallback(endpoint, options = {}) {
     }
     return {
       contacts: [
-        { id: 1, name: 'Mukesh Varma', email: 'mukeshvarma95117@gmail.com', phone: '+91 98765 43210', company: 'SmartSend AI', city: 'Bengaluru', group_name: 'VIP Clients' },
-        { id: 2, name: 'Alex Johnson', email: 'alex.j@enterprise.io', phone: '+1 415 555 2671', company: 'Acme Corp', city: 'San Francisco', group_name: 'Product Beta' },
-        { id: 3, name: 'Sarah Connor', email: 'sarah.c@cyberdyne.io', phone: '+1 310 555 9821', company: 'Cyberdyne', city: 'Los Angeles', group_name: 'VIP Clients' }
+        { id: 1, name: 'Mukesh Varma', email: 'mukeshvarma95117@gmail.com', phone: '+91 98765 43210', company: 'SmartSend AI', city: 'Bengaluru', group_id: 1, group_name: 'VIP Clients', group_color: '#6366F1', custom_fields: { event: 'AI Workshop', date: 'tomorrow, Sept 8', time: '10:00 AM' } },
+        { id: 2, name: 'Alex Johnson', email: 'alex.j@enterprise.io', phone: '+1 415 555 2671', company: 'Acme Corp', city: 'San Francisco', group_id: 2, group_name: 'Product Beta', group_color: '#10B981', custom_fields: { company: 'Acme Corp', role: 'CTO' } },
+        { id: 3, name: 'Sarah Connor', email: 'sarah.c@cyberdyne.io', phone: '+1 310 555 9821', company: 'Cyberdyne', city: 'Los Angeles', group_id: 1, group_name: 'VIP Clients', group_color: '#6366F1', custom_fields: { city: 'Los Angeles' } }
       ],
       total: 3
     };
@@ -65,12 +90,12 @@ function handleMockFallback(endpoint, options = {}) {
 
   if (endpoint.startsWith('/groups')) {
     if (method === 'POST') {
-      return { success: true, group: { id: 99, name: 'New Cohort', description: 'Demo group' } };
+      return { success: true, group: { id: 99, name: 'New Cohort', description: 'Demo group', color: '#6366F1', contacts_count: 0 } };
     }
     return {
       groups: [
-        { id: 1, name: 'VIP Clients', description: 'Enterprise tier customers', contacts_count: 2 },
-        { id: 2, name: 'Product Beta', description: 'Early adopters', contacts_count: 1 }
+        { id: 1, name: 'VIP Clients', description: 'Enterprise tier customers', color: '#6366F1', contacts_count: 2 },
+        { id: 2, name: 'Product Beta', description: 'Early adopters', color: '#10B981', contacts_count: 1 }
       ]
     };
   }
@@ -82,47 +107,107 @@ function handleMockFallback(endpoint, options = {}) {
     return {
       settings: {
         demo_mode: 'true',
-        email_provider: 'resend',
-        resend_api_key_is_set: true,
-        email_user: 'demo@smartsend.ai',
+        default_channel: 'email',
         default_tone: 'Professional',
-        timezone: 'Asia/Kolkata'
+        default_language: 'English',
+        timezone: 'Asia/Kolkata',
+        llm_provider: 'openai',
+        llm_model: 'gpt-4o-mini',
+        llm_base_url: 'https://api.openai.com/v1',
+        llm_api_key: '',
+        email_provider: 'resend',
+        resend_api_key: '',
+        resend_api_key_is_set: true,
+        resend_from: 'SmartSend AI <onboarding@resend.dev>',
+        email_host: 'smtp.gmail.com',
+        email_port: '587',
+        email_user: 'mukeshvarma95117@gmail.com',
+        email_pass: '',
+        email_pass_is_set: false,
+        email_from: 'SmartSend AI <notifications@smartsend.ai>',
+        whatsapp_provider: 'meta_cloud',
+        whatsapp_token: '',
+        whatsapp_phone_number_id: '',
+        sms_provider: 'twilio',
+        sms_account_sid: '',
+        sms_auth_token: '',
+        sms_from_number: '+15550100'
       }
     };
   }
 
   if (endpoint.startsWith('/ai/generate')) {
+    let promptText = 'AI Workshop Announcement';
+    try {
+      if (options.body) {
+        const parsed = JSON.parse(options.body);
+        if (parsed.prompt) promptText = parsed.prompt;
+      }
+    } catch (e) {}
+
     return {
-      subject: 'Special announcement from SmartSend AI for {{Name}}',
-      body: 'Hi {{Name}},\n\nWe are excited to share an exclusive update regarding {{Company}}. Our automated messaging engine is now active and delivering personalized communications across Email, WhatsApp, and SMS.\n\nBest regards,\nThe SmartSend AI Team',
-      cta: { label: 'Explore Features', url: 'https://smartsend.ai' }
+      success: true,
+      data: {
+        subject: `Update regarding ${promptText.slice(0, 35)} for {{name}}`,
+        body: `Hi {{name}},\n\nWe are excited to confirm the upcoming details regarding {{event}} on {{date}} at {{time}}.\n\nAll preparations are complete and your seat is reserved. Please let us know if you have any questions ahead of time.\n\nBest regards,\nThe SmartSend AI Team`,
+        short_version: `Reminder for {{name}}: {{event}} is confirmed for {{date}}.`,
+        cta: 'View Session Details',
+        modelUsed: 'SmartSend GenAI Engine (Built-in)',
+        isMock: true,
+        notice: 'Generated via built-in intelligent synthesizer.'
+      }
     };
   }
 
   if (endpoint.startsWith('/ai/rewrite')) {
+    let text = '';
+    let action = 'improve';
+    try {
+      if (options.body) {
+        const parsed = JSON.parse(options.body);
+        text = parsed.text || '';
+        action = parsed.action || 'improve';
+      }
+    } catch (e) {}
+
+    let modified = text;
+    if (action === 'shorter') modified = `Hi {{name}}, quick reminder: our session is confirmed for {{date}}. Let us know if you need any assistance!`;
+    else if (action === 'longer') modified = `${text}\n\nPlease don't hesitate to reach out to our team if you require additional information or special accommodations. We look forward to seeing you there!`;
+    else if (action === 'professional') modified = `Dear {{name}},\n\nWe are writing to officially confirm the scheduled arrangements. Kindly review the details provided at your convenience.\n\nSincerely,\nSmartSend AI Administration`;
+    else if (action === 'friendlier') modified = `Hey {{name}}! 👋 Just wanted to check in and make sure you're all set for {{date}}. Really looking forward to connecting!`;
+    else modified = `Hi {{name}},\n\nHere is an optimized update for you: everything is on track and ready. Looking forward to connecting!\n\nWarm regards,\nSmartSend Team`;
+
     return {
-      subject: 'Quick update for {{Name}}',
-      body: 'Hi {{Name}},\n\nHere is a quick message from {{Company}}: our new multi-channel messaging platform is live and ready for your team.\n\nWarm regards,\nSmartSend Team',
-      cta: { label: 'Learn More', url: 'https://smartsend.ai' }
+      success: true,
+      data: {
+        body: modified,
+        action
+      }
     };
   }
 
   if (endpoint.startsWith('/ai/translate')) {
     return {
-      subject: 'Actualización exclusiva para {{Name}}',
-      body: 'Hola {{Name}},\n\nQueríamos compartir una actualización importante sobre su espacio de trabajo en {{Company}}.\n\nSaludos cordiales,\nEl equipo de SmartSend'
+      success: true,
+      data: {
+        subject: 'Actualización exclusiva para {{name}}',
+        body: 'Hola {{name}},\n\nQueríamos compartir una actualización importante sobre su espacio de trabajo.\n\nSaludos cordiales,\nEl equipo de SmartSend'
+      }
     };
   }
 
   if (endpoint.startsWith('/messages/scheduled')) {
     if (endpoint.includes('send-now')) {
-      return { success: true, message: 'Dispatched immediately (Demo Mode)' };
+      return { success: true, successCount: 1, message: 'Dispatched immediately (Demo Mode)' };
     }
     if (endpoint.includes('cancel')) {
       return { success: true, message: 'Cancelled (Demo Mode)' };
     }
     if (endpoint.includes('process-queue')) {
-      return { success: true, result: { processedCount: 0, completed: 0, failed: 0 } };
+      return { success: true, processed: 0, message: 'Queue checked (Demo Mode)' };
+    }
+    if (endpoint.includes('clear-cancelled') || method === 'DELETE') {
+      return { success: true, message: 'Message removed from queue (Demo Mode)' };
     }
     return {
       scheduled: [
@@ -130,7 +215,7 @@ function handleMockFallback(endpoint, options = {}) {
           id: 1,
           channel: 'email',
           subject: 'Weekly Digest for Enterprise Leads',
-          body: 'Hi {{Name}}, discover our latest product updates!',
+          body: 'Hi {{name}}, discover our latest product updates!',
           scheduled_time: new Date(Date.now() + 86400000).toISOString(),
           timezone: 'Asia/Kolkata',
           status: 'scheduled',
@@ -142,20 +227,21 @@ function handleMockFallback(endpoint, options = {}) {
 
   if (endpoint.startsWith('/messages/logs') || endpoint.startsWith('/messages/delivery-logs')) {
     if (method === 'DELETE') {
-      return { success: true, message: 'Logs cleared (Demo Mode)' };
+      return { success: true, message: 'Delivery log record deleted (Demo Mode)' };
     }
     return {
       logs: [
         {
           id: 1,
           channel: 'email',
-          recipient_name: 'Mukesh Varma',
-          recipient_target: 'mukeshvarma95117@gmail.com',
+          contact_name: 'Mukesh Varma',
+          contact_target: 'mukeshvarma95117@gmail.com',
           status: 'delivered',
-          resolved_subject: 'Welcome to SmartSend AI',
-          resolved_body: 'Hi Mukesh Varma, welcome aboard!',
+          rendered_subject: 'Welcome to SmartSend AI GenAI 2.0',
+          rendered_body: 'Hi Mukesh Varma, welcome aboard! Your automated messaging system is live.',
           delivery_timestamp: new Date().toISOString(),
-          simulated: 1
+          is_demo: 1,
+          error_message: 'Delivered successfully via SmartSend Engine'
         }
       ],
       total: 1,
@@ -169,15 +255,23 @@ function handleMockFallback(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/settings/verify') || endpoint.startsWith('/settings/test') || endpoint.startsWith('/settings/setup-test-smtp')) {
-    return { success: true, verified: true, message: 'Verified successfully (Demo Mode)' };
+    return { success: true, valid: true, verified: true, message: 'Verified successfully (Demo Mode)' };
   }
 
-  if (endpoint.startsWith('/messages/send') || endpoint.startsWith('/messages/schedule')) {
+  if (endpoint.startsWith('/messages/send')) {
     return {
       success: true,
-      count: 1,
+      successCount: 1,
       message: 'Message dispatched successfully (Demo Simulation Mode)',
-      simulated: true
+      isDemo: true
+    };
+  }
+
+  if (endpoint.startsWith('/messages/schedule')) {
+    return {
+      success: true,
+      message: 'Message scheduled successfully (Demo Simulation Mode)',
+      isDemo: true
     };
   }
 
@@ -205,11 +299,13 @@ export async function request(endpoint, options = {}) {
     }
 
     if (response.status === 401) {
-      if (!window.location.pathname.includes('/login')) {
+      const isDemoToken = token && token.startsWith('demo-');
+      if (!isDemoToken && !window.location.pathname.includes('/login')) {
         localStorage.removeItem('smartsend_token');
         localStorage.removeItem('smartsend_user');
         window.location.href = '/login';
       }
+      return handleMockFallback(endpoint, options);
     }
 
     if (contentType.includes('application/json')) {

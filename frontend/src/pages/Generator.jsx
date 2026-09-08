@@ -247,7 +247,7 @@ export default function Generator() {
         type: messageType
       });
 
-      const data = res.data;
+      const data = res?.data || res || {};
       setSubject(data.subject || '');
       setBody(data.body || '');
       setShortVersion(data.short_version || '');
@@ -275,7 +275,8 @@ export default function Generator() {
         tone,
         channel
       });
-      setBody(res.data.body);
+      const data = res?.data || res || {};
+      if (data.body) setBody(data.body);
       success(`Applied refine: ${action}`, 'AI Refinement');
     } catch (err) {
       error(err.message || 'Failed to refine copy.');
@@ -294,8 +295,9 @@ export default function Generator() {
         body,
         targetLanguage: language
       });
-      if (res.data.subject) setSubject(res.data.subject);
-      if (res.data.body) setBody(res.data.body);
+      const data = res?.data || res || {};
+      if (data.subject) setSubject(data.subject);
+      if (data.body) setBody(data.body);
       success(`Translated message into ${language}`, 'Translation Complete');
     } catch (err) {
       error(err.message || 'Failed to translate copy.');

@@ -213,5 +213,11 @@ button:disabled {
   transform: scale(0.97) translateX(1px);
 }
 
-
-
+/* Hide scrollbar utility for sleek horizontal nav bars */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { ToastProvider } from './context/ToastContext';
@@ -38,15 +38,7 @@ function ProtectedLayout() {
       <Navbar />
       <main className="flex-1 w-full max-w-[1600px] mx-auto p-4 sm:p-6 lg:p-8 min-w-0">
         <div key={location.pathname} className="animate-page-enter">
-          <Routes location={location}>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/generator" element={<Generator />} />
-            <Route path="/contacts" element={<Contacts />} />
-            <Route path="/scheduled" element={<Scheduled />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          <Outlet />
         </div>
       </main>
     </div>
@@ -61,7 +53,15 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path="/login" element={<Login />} />
-              <Route path="/*" element={<ProtectedLayout />} />
+              <Route element={<ProtectedLayout />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/generator" element={<Generator />} />
+                <Route path="/contacts" element={<Contacts />} />
+                <Route path="/scheduled" element={<Scheduled />} />
+                <Route path="/history" element={<History />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Route>
             </Routes>
           </BrowserRouter>
         </ToastProvider>
