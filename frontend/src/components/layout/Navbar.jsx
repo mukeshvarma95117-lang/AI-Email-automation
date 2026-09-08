@@ -176,7 +176,7 @@ export default function Navbar() {
       {/* Main Menu Options Bar on the Top */}
       <div className="px-4 sm:px-6 lg:px-8 bg-slate-50/75 dark:bg-slate-900/70 border-b border-slate-100 dark:border-slate-800/40">
         <div className="max-w-[1600px] mx-auto flex items-center justify-between">
-          <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto py-2 no-scrollbar">
+          <nav className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto overflow-y-hidden py-1.5 no-scrollbar">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               return (
@@ -185,10 +185,10 @@ export default function Navbar() {
                   to={item.path}
                   end={item.path === '/'}
                   className={({ isActive }) =>
-                    `group relative flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all duration-200 select-none cursor-pointer active:scale-95 btn-lift ${
+                    `group flex items-center gap-2 px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-colors duration-150 select-none cursor-pointer active:scale-95 ${
                       isActive
                         ? 'bg-indigo-600 text-white shadow-sm shadow-indigo-600/25'
-                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/70 dark:hover:bg-slate-800/70'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/80 dark:hover:bg-slate-800/80'
                     }`
                   }
                 >
@@ -207,9 +207,6 @@ export default function Navbar() {
                           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
                           <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
                         </span>
-                      )}
-                      {isActive && (
-                        <span className="absolute -bottom-2 left-2 right-2 h-0.5 bg-indigo-600 dark:bg-indigo-400 rounded-full shadow-xs animate-in fade-in zoom-in duration-200" />
                       )}
                     </>
                   )}
