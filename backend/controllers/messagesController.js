@@ -2,6 +2,7 @@ import dbHelper from '../database/db.js';
 import { resolveVariables, extractVariables } from '../services/variableResolver.js';
 import { sendEmail } from '../services/emailService.js';
 import { sendWhatsAppMessage } from '../services/whatsappService.js';
+import { sendSms } from '../services/smsService.js';
 import {
   cancelScheduledMessage,
   deleteScheduledMessage,
@@ -25,6 +26,7 @@ export async function sendMessage(req, res) {
       channel = 'email',
       recipientIds = [],
       groupId = null,
+      sendToAll = false,
       customRecipients = [],
       globalVars = {}
     } = req.body;
@@ -40,7 +42,7 @@ export async function sendMessage(req, res) {
 
     // Resolve target contacts
     let targetContacts = [];
-    if (groupId) {
+    if (groupId && groupId !== 'all') {
       targetContacts = dbHelper.all(
         `SELECT c.*, g.name as group_name 
          FROM contacts c 
@@ -65,6 +67,13 @@ export async function sendMessage(req, res) {
         phone: cr.phone || null,
         custom_fields: cr.custom_fields || {}
       }));
+    } else if (groupId === 'all' || sendToAll || (!groupId && !recipientIds?.length && !customRecipients?.length)) {
+      // Fallback: broadcast to all contacts
+      targetContacts = dbHelper.all(
+        `SELECT c.*, g.name as group_name 
+         FROM contacts c 
+         LEFT JOIN groups_table g ON c.group_id = g.id`
+      );
     }
 
     if (targetContacts.length === 0) {
@@ -198,6 +207,7 @@ export async function scheduleMessage(req, res) {
       channel = 'email',
       recipientIds = [],
       groupId = null,
+      sendToAll = false,
       scheduled_time,
       timezone = 'UTC'
     } = req.body;
@@ -212,9 +222,12 @@ export async function scheduleMessage(req, res) {
 
     // Resolve recipient IDs
     let finalIds = [...(recipientIds || [])];
-    if (groupId) {
+    if (groupId && groupId !== 'all') {
       const groupContacts = dbHelper.all('SELECT id FROM contacts WHERE group_id = ?', [groupId]);
       finalIds = groupContacts.map(c => c.id);
+    } else if (groupId === 'all' || sendToAll || finalIds.length === 0) {
+      const allContacts = dbHelper.all('SELECT id FROM contacts');
+      finalIds = allContacts.map(c => c.id);
     }
 
     if (finalIds.length === 0) {

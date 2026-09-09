@@ -45,6 +45,30 @@ Vikram Sethi,vikram@example.com,+1 555-0303,Web Dev Cohort,Full Stack Review,Fri
     reader.readAsText(selected);
   };
 
+  const parseCsvLine = (text) => {
+    const result = [];
+    let cur = '';
+    let inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (c === '"') {
+        if (inQuotes && text[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (c === ',' && !inQuotes) {
+        result.push(cur.trim());
+        cur = '';
+      } else {
+        cur += c;
+      }
+    }
+    result.push(cur.trim());
+    return result;
+  };
+
   const parseCsv = (csvText) => {
     const lines = csvText.split(/\r?\n/).filter(line => line.trim().length > 0);
     if (lines.length < 2) {
@@ -53,16 +77,16 @@ Vikram Sethi,vikram@example.com,+1 555-0303,Web Dev Cohort,Full Stack Review,Fri
     }
 
     // Parse header row
-    const rawHeaders = lines[0].split(',').map(h => h.trim().replace(/^["']|["']$/g, ''));
+    const rawHeaders = parseCsvLine(lines[0]).map(h => h.trim().replace(/^["']|["']$/g, ''));
     setHeaders(rawHeaders);
 
     const rows = [];
     for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim().replace(/^["']|["']$/g, ''));
-      if (values.length === rawHeaders.length) {
+      const values = parseCsvLine(lines[i]).map(v => v.trim().replace(/^["']|["']$/g, ''));
+      if (values.length > 0 && values.some(v => v.length > 0)) {
         const rowObj = {};
         rawHeaders.forEach((h, idx) => {
-          rowObj[h] = values[idx];
+          rowObj[h] = values[idx] !== undefined ? values[idx] : '';
         });
         rows.push(rowObj);
       }

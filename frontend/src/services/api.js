@@ -90,12 +90,12 @@ function handleMockFallback(endpoint, options = {}) {
 
   if (endpoint.startsWith('/groups')) {
     if (method === 'POST') {
-      return { success: true, group: { id: 99, name: 'New Cohort', description: 'Demo group', color: '#6366F1', contacts_count: 0 } };
+      return { success: true, group: { id: 99, name: 'New Cohort', description: 'Demo group', color: '#6366F1', contact_count: 0, contacts_count: 0 } };
     }
     return {
       groups: [
-        { id: 1, name: 'VIP Clients', description: 'Enterprise tier customers', color: '#6366F1', contacts_count: 2 },
-        { id: 2, name: 'Product Beta', description: 'Early adopters', color: '#10B981', contacts_count: 1 }
+        { id: 1, name: 'VIP Clients', description: 'Enterprise tier customers', color: '#6366F1', contact_count: 2, contacts_count: 2 },
+        { id: 2, name: 'Product Beta', description: 'Early adopters', color: '#10B981', contact_count: 1, contacts_count: 1 }
       ]
     };
   }

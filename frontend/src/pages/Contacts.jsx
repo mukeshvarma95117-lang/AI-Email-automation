@@ -105,9 +105,53 @@ export default function Contacts() {
     }
   };
 
-  const handleExportCsv = () => {
-    window.open('/api/contacts/export', '_blank');
-    success('Contacts CSV exported.');
+  const handleExportCsv = async () => {
+    try {
+      const token = localStorage.getItem('smartsend_token');
+      let csvData = null;
+
+      try {
+        const res = await fetch('/api/contacts/export', {
+          headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+        });
+        const contentType = res.headers.get('content-type') || '';
+        if (res.ok && contentType.includes('text/csv')) {
+          csvData = await res.text();
+        }
+      } catch (_) {
+        csvData = null;
+      }
+
+      // Fallback if backend is unavailable or running on static demo
+      if (!csvData) {
+        const headers = ['Name', 'Email', 'Phone', 'Group', 'Custom Fields'];
+        const lines = [headers.join(',')];
+        for (const c of contacts) {
+          const line = [
+            `"${(c.name || '').replace(/"/g, '""')}"`,
+            `"${(c.email || '').replace(/"/g, '""')}"`,
+            `"${(c.phone || '').replace(/"/g, '""')}"`,
+            `"${(c.group_name || '').replace(/"/g, '""')}"`,
+            `"${(typeof c.custom_fields === 'object' ? JSON.stringify(c.custom_fields) : (c.custom_fields || '{}')).replace(/"/g, '""')}"`
+          ];
+          lines.push(line.join(','));
+        }
+        csvData = lines.join('\n');
+      }
+
+      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `smartsend_contacts_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      success('Contacts CSV exported successfully.');
+    } catch (err) {
+      error(err.message || 'Failed to export contacts CSV.');
+    }
   };
 
   return (

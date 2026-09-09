@@ -188,6 +188,23 @@ export async function sendViaResend({ to, subject, body, isHtml = false, cta = '
 
     if (!res.ok) {
       let friendlyError = data.message || `Resend Error (${res.status})`;
+
+      // If custom domain is pending DNS verification, seamlessly fallback to onboarding@resend.dev
+      if (from !== 'SmartSend AI <onboarding@resend.dev>' && friendlyError.toLowerCase().includes('not verified')) {
+        console.log(`Custom domain ${from} is pending DNS verification on Resend. Falling back to onboarding@resend.dev...`);
+        return sendViaResend({
+          to,
+          subject,
+          body,
+          isHtml,
+          cta,
+          customConfig: {
+            ...config,
+            resendFrom: 'SmartSend AI <onboarding@resend.dev>'
+          }
+        });
+      }
+
       if (res.status === 403 && friendlyError.includes('only send testing emails')) {
         friendlyError = `Resend Free Sandbox: ${friendlyError}`;
       }

@@ -367,6 +367,7 @@ export default function Generator() {
   const handleSendConfirm = async () => {
     setIsSending(true);
     try {
+      const isAllGroup = recipientMode === 'group' && (!selectedGroupId || selectedGroupId === 'all');
       const payload = {
         prompt,
         subject,
@@ -374,8 +375,9 @@ export default function Generator() {
         short_version: shortVersion,
         cta,
         channel,
-        groupId: recipientMode === 'group' ? (selectedGroupId ? Number(selectedGroupId) : null) : null,
-        recipientIds: recipientMode === 'individual' ? selectedContactIds : null,
+        groupId: recipientMode === 'group' ? (selectedGroupId && selectedGroupId !== 'all' ? Number(selectedGroupId) : 'all') : null,
+        recipientIds: recipientMode === 'individual' ? selectedContactIds : (isAllGroup ? contacts.map(c => c.id) : null),
+        sendToAll: isAllGroup,
         customRecipients: recipientMode === 'custom' ? customRecipients : null
       };
 
@@ -389,7 +391,9 @@ export default function Generator() {
         origin: { y: 0.6 }
       });
 
-      const modeText = res.isDemo ? 'Demo Mode Simulation' : 'Live SMTP Delivery';
+      const modeText = res.isDemo 
+        ? 'Demo Mode Simulation' 
+        : (channel === 'email' && emailProvider === 'resend' ? 'Live Resend Cloud Delivery' : 'Live Delivery');
       success(
         `Dispatched to ${res.successCount} recipients (${modeText})`,
         'Message Sent!'
@@ -407,6 +411,7 @@ export default function Generator() {
   const handleScheduleConfirm = async ({ scheduledDateTime, timezone }) => {
     setIsSending(true);
     try {
+      const isAllGroup = recipientMode === 'group' && (!selectedGroupId || selectedGroupId === 'all');
       const payload = {
         prompt,
         subject,
@@ -414,8 +419,9 @@ export default function Generator() {
         short_version: shortVersion,
         cta,
         channel,
-        groupId: recipientMode === 'group' ? (selectedGroupId ? Number(selectedGroupId) : null) : null,
+        groupId: recipientMode === 'group' ? (selectedGroupId && selectedGroupId !== 'all' ? Number(selectedGroupId) : 'all') : null,
         recipientIds: recipientMode === 'individual' ? selectedContactIds : currentRecipients.map(c => c.id),
+        sendToAll: isAllGroup,
         scheduled_time: scheduledDateTime,
         timezone
       };

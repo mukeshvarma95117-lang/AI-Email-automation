@@ -19,11 +19,21 @@ export function substituteVariables(text, contact = {}, globalVars = {}) {
       : contact.custom_fields;
   }
 
+  const fullName = contact.name || '';
+  const nameParts = fullName.trim().split(/\s+/);
+  const firstName = nameParts[0] || '';
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+
   const merged = {
-    name: contact.name || '',
+    ...contact,
+    name: fullName,
+    first_name: contact.first_name || firstName,
+    firstname: contact.firstname || firstName,
+    last_name: contact.last_name || lastName,
+    lastname: contact.lastname || lastName,
     email: contact.email || '',
     phone: contact.phone || '',
-    group: contact.group_name || '',
+    group: contact.group_name || contact.group || '',
     ...globalVars,
     ...customFields
   };
