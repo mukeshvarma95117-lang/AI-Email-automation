@@ -101,20 +101,15 @@ export default function Login() {
                 Workspace Sign In
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Enter your administrator credentials to access your console.
+                Enter your credentials to access your account.
               </p>
             </div>
 
             {/* Error Message Alert */}
             {errorMessage && (
-              <div className="mb-5 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-2.5 shadow-sm animate-in fade-in">
-                <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold">{errorMessage}</p>
-                  <p className="text-[11px] text-rose-600/80 dark:text-rose-300/80 mt-0.5">
-                    Access is restricted to the administrator (admin@smartsendai.online).
-                  </p>
-                </div>
+              <div className="mb-5 p-3.5 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-200 text-xs flex items-center gap-2.5 shadow-sm animate-in fade-in">
+                <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 shrink-0" />
+                <p className="font-semibold">{errorMessage}</p>
               </div>
             )}
 
@@ -123,12 +118,12 @@ export default function Login() {
               <div className="space-y-1.5">
                 <label className="text-[11px] font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-slate-400" />
-                  <span>Admin Email</span>
+                  <span>Email Address</span>
                 </label>
                 <input
                   type="email"
                   required
-                  placeholder="admin@smartsendai.online"
+                  placeholder="name@company.com"
                   value={email}
                   onChange={e => {
                     setEmail(e.target.value);
@@ -180,7 +175,7 @@ export default function Login() {
 
                 <button
                   type="button"
-                  onClick={() => info('To reset your administrator credentials, please use the Supabase Auth dashboard.', 'Admin Reset')}
+                  onClick={() => info('Please contact your administrator to reset your credentials.', 'Password Reset')}
                   className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
                 >
                   Forgot password?
@@ -210,7 +205,7 @@ export default function Login() {
           {/* Security Notice Footer */}
           <div className="pt-6 border-t border-slate-100 dark:border-slate-800/80 mt-6 flex items-center gap-2 text-[11px] text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-            <span>Restricted workspace. Public registration is permanently closed.</span>
+            <span>Protected workspace environment.</span>
           </div>
         </div>
 

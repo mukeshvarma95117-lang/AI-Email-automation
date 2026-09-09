@@ -31,7 +31,7 @@ function handleMockFallback(endpoint, options = {}) {
       };
     }
 
-    throw new Error('Access denied. Only the workspace administrator (admin@smartsendai.online) can sign in.');
+    throw new Error('Invalid email or password. Please try again.');
   }
 
   if (endpoint.startsWith('/auth/me')) {
@@ -450,10 +450,10 @@ export const api = {
     }
 
     // 3. Deny any other credentials
-    throw new Error('Access denied. Only the workspace administrator (admin@smartsendai.online) can sign in.');
+    throw new Error('Invalid email or password. Please try again.');
   },
   register: async () => {
-    throw new Error('Public registration is disabled. Only authorized administrators can access this workspace.');
+    throw new Error('Registration is currently disabled.');
   },
   getMe: async () => {
     if (isSupabaseConfigured) {

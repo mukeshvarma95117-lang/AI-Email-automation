@@ -14,15 +14,18 @@ export async function login(req, res) {
     const user = dbHelper.get('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
     
     if (!user) {
-      return res.status(404).json({ 
-        error: 'No authorized account found with this email. Please contact your administrator.', 
-        code: 'USER_NOT_FOUND' 
+      return res.status(401).json({ 
+        error: 'Invalid email or password. Please try again.', 
+        code: 'INVALID_CREDENTIALS' 
       });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
-      return res.status(401).json({ error: 'Incorrect password. Please try again.' });
+      return res.status(401).json({ 
+        error: 'Invalid email or password. Please try again.',
+        code: 'INVALID_CREDENTIALS'
+      });
     }
 
     const token = generateToken(user);
