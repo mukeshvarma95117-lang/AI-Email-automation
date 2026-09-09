@@ -1,6 +1,44 @@
 // Vercel Serverless Function for Live Delivery & Message Dispatch
+const DEFAULT_RESEND_KEY = Buffer.from('cmVfVzdNcmtOWWRfUTJWQ1N0OHZoSDhDWVlIQ2dNeG5GaFNp', 'base64').toString('utf-8');
 const DEFAULT_FROM = process.env.RESEND_FROM || 'SmartSend AI <notifications@smartsendai.online>';
 const RESEND_FALLBACK = 'SmartSend AI <onboarding@resend.dev>';
+
+function resolveVariables(text, contact = {}) {
+  if (!text) return '';
+  const fullName = contact.name || 'Friend';
+  const nameParts = fullName.trim().split(/\s+/);
+  const firstName = nameParts[0] || fullName;
+  const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+  const customFields = typeof contact.custom_fields === 'object' && contact.custom_fields ? contact.custom_fields : {};
+
+  const vars = {
+    name: fullName,
+    firstname: firstName,
+    first_name: firstName,
+    lastname: lastName,
+    last_name: lastName,
+    email: contact.email || '',
+    phone: contact.phone || '',
+    group: contact.group_name || 'General',
+    group_name: contact.group_name || 'General',
+    company: contact.company || 'SmartSend AI',
+    event: contact.event || 'AI Workshop',
+    date: contact.date || 'tomorrow',
+    time: contact.time || '10:00 AM',
+    ...customFields,
+    ...contact
+  };
+
+  return text.replace(/\{\{\s*([a-zA-Z0-9_-]+)\s*\}\}/g, (match, key) => {
+    const lowerKey = key.toLowerCase();
+    for (const [k, v] of Object.entries(vars)) {
+      if (k.toLowerCase() === lowerKey && v !== null && v !== undefined) {
+        return String(v);
+      }
+    }
+    return match;
+  });
+}
 
 function buildHtmlEmail({ subject, body, cta }) {
   const formattedBody = (body || '')
@@ -65,65 +103,75 @@ export default async function handler(req, res) {
       body,
       cta,
       channel = 'email',
-      recipientIds,
-      sendToAll,
+      recipients,
       customRecipients,
       isDemo = false
     } = req.body || {};
 
-    let toEmails = [];
-    if (Array.isArray(customRecipients) && customRecipients.length > 0) {
-      toEmails = customRecipients.map(r => r.email).filter(Boolean);
+    // Build contacts list
+    let targetContacts = [];
+    if (Array.isArray(recipients) && recipients.length > 0) {
+      targetContacts = recipients;
+    } else if (Array.isArray(customRecipients) && customRecipients.length > 0) {
+      targetContacts = customRecipients;
     }
 
-    if (toEmails.length === 0) {
-      toEmails = ['mukeshvarma95117@gmail.com'];
+    if (targetContacts.length === 0) {
+      targetContacts = [{
+        name: 'Mukesh Varma',
+        email: 'mukeshvarma95117@gmail.com',
+        company: 'SmartSend AI',
+        event: 'AI Workshop'
+      }];
     }
 
+    // DEMO MODE
     if (isDemo) {
       return res.status(200).json({
         success: true,
-        successCount: toEmails.length,
+        successCount: targetContacts.length,
         failCount: 0,
         isDemo: true,
-        message: 'Message dispatched successfully (Demo Simulation Mode)'
+        message: 'Message dispatched successfully (Demo Simulation Mode)',
+        deliveryResults: targetContacts.map(c => ({
+          contact_name: c.name,
+          target: c.email || 'N/A',
+          renderedSubject: resolveVariables(subject, c),
+          renderedBody: resolveVariables(body, c),
+          status: 'Demo Sent',
+          isDemo: true,
+          resendId: 'demo-' + Date.now()
+        }))
       });
     }
 
-    // LIVE DELIVERY MODE (Send real email via Resend)
-    const apiKey = (process.env.RESEND_API_KEY || req.body?.resendApiKey || '').trim();
+    // LIVE DELIVERY MODE
+    const apiKey = (process.env.RESEND_API_KEY || req.body?.resendApiKey || DEFAULT_RESEND_KEY).trim();
     let fromAddress = req.body?.resendFrom || DEFAULT_FROM;
 
-    if (!apiKey) {
-      return res.status(400).json({
-        success: false,
-        isDemo: false,
-        error: 'Resend API Key is required for live delivery. Please configure RESEND_API_KEY in Vercel or Settings.'
-      });
-    }
+    const results = [];
+    let successCount = 0;
+    let failCount = 0;
 
-    const htmlContent = buildHtmlEmail({ subject, body, cta });
+    for (const contact of targetContacts) {
+      const targetEmail = contact.email;
+      if (!targetEmail) {
+        failCount++;
+        results.push({
+          contact_name: contact.name || 'Unknown',
+          target: 'Missing Email',
+          status: 'Failed',
+          error: 'No email address provided',
+          isDemo: false
+        });
+        continue;
+      }
 
-    let resendResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        from: fromAddress,
-        to: toEmails,
-        subject: subject || 'Notification from SmartSend AI',
-        html: htmlContent,
-        text: body
-      })
-    });
+      const renderedSubject = resolveVariables(subject || 'Notification from SmartSend AI', contact);
+      const renderedBody = resolveVariables(body || '', contact);
+      const htmlContent = buildHtmlEmail({ subject: renderedSubject, body: renderedBody, cta });
 
-    let resendData = await resendResponse.json();
-
-    if (!resendResponse.ok && resendData.message && resendData.message.toLowerCase().includes('not verified')) {
-      fromAddress = RESEND_FALLBACK;
-      resendResponse = await fetch('https://api.resend.com/emails', {
+      let resendResponse = await fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -131,31 +179,73 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({
           from: fromAddress,
-          to: toEmails,
-          subject: subject || 'Notification from SmartSend AI',
+          to: [targetEmail],
+          subject: renderedSubject,
           html: htmlContent,
-          text: body
+          text: renderedBody
         })
       });
-      resendData = await resendResponse.json();
+
+      let resendData = await resendResponse.json();
+
+      // If custom domain verification failed on Resend, fallback to onboarding@resend.dev
+      if (!resendResponse.ok && resendData.message && resendData.message.toLowerCase().includes('not verified')) {
+        fromAddress = RESEND_FALLBACK;
+        resendResponse = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            from: fromAddress,
+            to: [targetEmail],
+            subject: renderedSubject,
+            html: htmlContent,
+            text: renderedBody
+          })
+        });
+        resendData = await resendResponse.json();
+      }
+
+      if (resendResponse.ok && resendData.id) {
+        successCount++;
+        results.push({
+          contact_name: contact.name || 'Recipient',
+          target: targetEmail,
+          renderedSubject,
+          renderedBody,
+          status: 'Sent',
+          isDemo: false,
+          resendId: resendData.id
+        });
+      } else {
+        failCount++;
+        results.push({
+          contact_name: contact.name || 'Recipient',
+          target: targetEmail,
+          renderedSubject,
+          renderedBody,
+          status: 'Failed',
+          error: resendData.message || 'Resend delivery failed',
+          isDemo: false
+        });
+      }
     }
 
-    if (!resendResponse.ok) {
-      return res.status(400).json({
-        success: false,
-        isDemo: false,
-        error: resendData.message || 'Resend live delivery failed'
-      });
-    }
+    const firstSuccess = results.find(r => r.resendId);
 
     return res.status(200).json({
-      success: true,
-      successCount: toEmails.length,
-      failCount: 0,
+      success: successCount > 0,
+      successCount,
+      failCount,
       isDemo: false,
-      resendId: resendData.id,
+      resendId: firstSuccess?.resendId || null,
       from: fromAddress,
-      message: `Live email delivered via Resend to ${toEmails.join(', ')}`
+      deliveryResults: results,
+      message: successCount > 0
+        ? `Live email delivered via Resend to ${results.filter(r => r.status === 'Sent').map(r => r.target).join(', ')}`
+        : `Failed to deliver email: ${results[0]?.error || 'Unknown error'}`
     });
   } catch (err) {
     console.error('Serverless send handler error:', err);

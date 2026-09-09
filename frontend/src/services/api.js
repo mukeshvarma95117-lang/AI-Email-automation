@@ -606,76 +606,78 @@ export const api = {
     }
 
     if (serverlessSuccess) {
+      const deliveryList = Array.isArray(serverlessRes.deliveryResults) && serverlessRes.deliveryResults.length > 0
+        ? serverlessRes.deliveryResults
+        : [{
+            contact_name: data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Mukesh Varma'),
+            target: data.customRecipients?.[0]?.email || 'mukeshvarma95117@gmail.com',
+            renderedSubject: data.subject || '',
+            renderedBody: data.body || '',
+            status: isDemo ? 'Demo Sent' : 'Sent',
+            isDemo,
+            resendId: serverlessRes.resendId
+          }];
+
       // Record in localStorage
       try {
         const existing = localStorage.getItem('smartsend_delivery_logs');
         const logs = existing ? JSON.parse(existing) : [];
-        logs.unshift({
-          id: Date.now(),
-          channel: data.channel || 'email',
-          contact_name: data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Mukesh Varma'),
-          contact_target: data.customRecipients?.[0]?.email || 'mukeshvarma95117@gmail.com',
-          rendered_subject: data.subject || '',
-          rendered_body: data.body || '',
-          status: isDemo ? 'Demo Sent' : 'Sent',
-          is_demo: isDemo ? 1 : 0,
-          error_message: isDemo ? 'Delivered via Demo Simulation' : (serverlessRes.message || 'Live Delivery via Resend Cloud API'),
-          delivery_timestamp: new Date().toISOString()
-        });
+        for (const item of deliveryList) {
+          logs.unshift({
+            id: Date.now() + Math.floor(Math.random() * 1000),
+            channel: data.channel || 'email',
+            contact_name: item.contact_name,
+            contact_target: item.target,
+            rendered_subject: item.renderedSubject || data.subject,
+            rendered_body: item.renderedBody || data.body,
+            status: item.status || (isDemo ? 'Demo Sent' : 'Sent'),
+            is_demo: isDemo ? 1 : 0,
+            error_message: isDemo ? 'Delivered via Demo Simulation' : (item.resendId ? `Resend Message ID: ${item.resendId}` : (serverlessRes.message || 'Live Delivery via Resend Cloud API')),
+            delivery_timestamp: new Date().toISOString()
+          });
+        }
         localStorage.setItem('smartsend_delivery_logs', JSON.stringify(logs.slice(0, 100)));
       } catch (e) {}
+
+      // If Supabase is configured, record in Supabase
+      if (isSupabaseConfigured) {
+        try {
+          const { data: msg } = await supabase.from('messages').insert([{
+            prompt: data.prompt || '',
+            subject: data.subject || '',
+            body: data.body || '',
+            short_version: data.short_version || '',
+            cta: data.cta || '',
+            channel: data.channel || 'email',
+            recipient_count: deliveryList.length,
+            recipients_json: JSON.stringify(deliveryList.map(d => d.target)),
+            status: isDemo ? 'demo_sent' : 'sent',
+            is_demo: isDemo ? 1 : 0
+          }]).select().single();
+
+          for (const item of deliveryList) {
+            await supabase.from('message_logs').insert([{
+              message_id: msg?.id || null,
+              channel: data.channel || 'email',
+              contact_name: item.contact_name,
+              contact_target: item.target,
+              rendered_subject: item.renderedSubject || data.subject,
+              rendered_body: item.renderedBody || data.body,
+              status: item.status || (isDemo ? 'Demo Sent' : 'Sent'),
+              is_demo: isDemo ? 1 : 0,
+              error_message: isDemo ? 'Delivered via Demo Simulation' : `Resend Message ID: ${item.resendId || 'Delivered'}`,
+              delivery_timestamp: new Date().toISOString()
+            }]);
+          }
+        } catch (e) {}
+      }
 
       return serverlessRes;
     }
 
-    // Direct Supabase cloud persistence fallback
-    if (isSupabaseConfigured) {
-      try {
-        const recipientCount = Array.isArray(data.recipientIds) ? data.recipientIds.length : (data.sendToAll ? 1 : 1);
-        const { data: msg } = await supabase.from('messages').insert([{
-          prompt: data.prompt || '',
-          subject: data.subject || '',
-          body: data.body || '',
-          short_version: data.short_version || '',
-          cta: data.cta || '',
-          channel: data.channel || 'email',
-          recipient_count: recipientCount,
-          recipients_json: JSON.stringify(data.recipientIds || []),
-          status: isDemo ? 'demo_sent' : 'sent',
-          is_demo: isDemo ? 1 : 0
-        }]).select().single();
-
-        const logRecord = {
-          message_id: msg?.id || null,
-          channel: data.channel || 'email',
-          contact_name: data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Mukesh Varma'),
-          contact_target: data.customRecipients?.[0]?.email || 'mukeshvarma95117@gmail.com',
-          rendered_subject: data.subject || '',
-          rendered_body: data.body || '',
-          status: isDemo ? 'Demo Sent' : 'Sent',
-          is_demo: isDemo ? 1 : 0,
-          error_message: isDemo ? 'Delivered via Demo Simulation' : 'Live Delivery via SmartSend Engine',
-          delivery_timestamp: new Date().toISOString()
-        };
-
-        await supabase.from('message_logs').insert([logRecord]);
-
-        try {
-          const existing = localStorage.getItem('smartsend_delivery_logs');
-          const logs = existing ? JSON.parse(existing) : [];
-          logs.unshift({ id: Date.now(), ...logRecord });
-          localStorage.setItem('smartsend_delivery_logs', JSON.stringify(logs.slice(0, 100)));
-        } catch (e) {}
-
-        return {
-          success: true,
-          successCount: recipientCount,
-          message: isDemo ? 'Dispatched in Demo Simulation Mode' : 'Dispatched in Live Delivery Mode',
-          isDemo
-        };
-      } catch (e) {
-        console.warn('Supabase sendMessage fallback:', e);
-      }
+    if (!serverlessSuccess && !isLocal && !hasCustomApiUrl) {
+      const errorMsg = serverlessRes?.error || 'Live delivery failed via Resend. Please check your API key and recipient email.';
+      throw new Error(errorMsg);
     }
 
     return request('/messages/send', { method: 'POST', body: JSON.stringify({ ...data, isDemo }) });
