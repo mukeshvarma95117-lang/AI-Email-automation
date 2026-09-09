@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { api } from '../services/api';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 const AuthContext = createContext(null);
 
@@ -9,64 +10,97 @@ export function AuthProvider({ children }) {
     try {
       if (saved) return JSON.parse(saved);
     } catch {}
-    return { id: 1, name: 'Admin User', email: 'admin@smartsend.ai', role: 'admin' };
+    return null;
   });
 
   const [token, setToken] = useState(() => {
-    const saved = localStorage.getItem('smartsend_token');
-    if (saved) return saved;
-    const initialToken = 'demo-session-' + Date.now();
-    localStorage.setItem('smartsend_token', initialToken);
-    localStorage.setItem('smartsend_user', JSON.stringify({ id: 1, name: 'Admin User', email: 'admin@smartsend.ai', role: 'admin' }));
-    return initialToken;
+    return localStorage.getItem('smartsend_token') || null;
   });
 
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (token && !token.startsWith('demo-')) {
-      let isDone = false;
-      const timer = setTimeout(() => {
-        if (!isDone) setLoading(false);
-      }, 2500);
+    let mounted = true;
 
-      api.getMe()
-        .then(res => {
-          isDone = true;
-          if (res?.user) {
-            setUser(res.user);
-            localStorage.setItem('smartsend_user', JSON.stringify(res.user));
+    async function initAuth() {
+      // 1. Check Supabase Auth session if configured
+      if (isSupabaseConfigured) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.user && mounted) {
+            const adminUser = {
+              id: session.user.id,
+              name: session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+              email: session.user.email,
+              role: 'admin'
+            };
+            setToken(session.access_token);
+            setUser(adminUser);
+            localStorage.setItem('smartsend_token', session.access_token);
+            localStorage.setItem('smartsend_user', JSON.stringify(adminUser));
+            setLoading(false);
+            return;
           }
-        })
-        .catch((err) => {
-          isDone = true;
-          // Only log out if specifically 401 Unauthorized from live backend
-          if (err?.message?.includes('401') || err?.message?.includes('token')) {
-            logout();
-          }
-        })
-        .finally(() => {
-          isDone = true;
-          clearTimeout(timer);
-          setLoading(false);
-        });
-    } else {
-      setLoading(false);
+        } catch (e) {
+          console.warn('Supabase session check error:', e);
+        }
+      }
+
+      // 2. Check existing local token
+      const existingToken = localStorage.getItem('smartsend_token');
+      if (existingToken && mounted) {
+        setToken(existingToken);
+        const existingUser = localStorage.getItem('smartsend_user');
+        if (existingUser) {
+          try {
+            setUser(JSON.parse(existingUser));
+          } catch {}
+        }
+      } else if (mounted) {
+        setToken(null);
+        setUser(null);
+      }
+
+      if (mounted) setLoading(false);
     }
-  }, [token]);
 
-  const login = async (email, password, autoRegister = false) => {
-    const res = await api.login({ email, password, autoRegister });
-    localStorage.setItem('smartsend_token', res.token);
-    localStorage.setItem('smartsend_user', JSON.stringify(res.user));
-    setToken(res.token);
-    setUser(res.user);
-    return res;
-  };
+    initAuth();
 
-  const register = async (name, email, password, autoLogin = false) => {
-    const res = await api.register({ name, email, password });
-    if (autoLogin) {
+    // Listen to Supabase auth state changes (e.g. sign in, sign out, token refresh)
+    let authSubscription = null;
+    if (isSupabaseConfigured) {
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (!mounted) return;
+        if (event === 'SIGNED_IN' && session?.user) {
+          const adminUser = {
+            id: session.user.id,
+            name: session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+            email: session.user.email,
+            role: 'admin'
+          };
+          setToken(session.access_token);
+          setUser(adminUser);
+          localStorage.setItem('smartsend_token', session.access_token);
+          localStorage.setItem('smartsend_user', JSON.stringify(adminUser));
+        } else if (event === 'SIGNED_OUT') {
+          setToken(null);
+          setUser(null);
+          localStorage.removeItem('smartsend_token');
+          localStorage.removeItem('smartsend_user');
+        }
+      });
+      authSubscription = data?.subscription;
+    }
+
+    return () => {
+      mounted = false;
+      if (authSubscription) authSubscription.unsubscribe();
+    };
+  }, []);
+
+  const login = async (email, password) => {
+    const res = await api.login({ email, password });
+    if (res?.token && res?.user) {
       localStorage.setItem('smartsend_token', res.token);
       localStorage.setItem('smartsend_user', JSON.stringify(res.user));
       setToken(res.token);
@@ -75,7 +109,16 @@ export function AuthProvider({ children }) {
     return res;
   };
 
-  const logout = () => {
+  const register = async () => {
+    throw new Error('Public registration is disabled. Only authorized administrators can access this workspace.');
+  };
+
+  const logout = async () => {
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.auth.signOut();
+      } catch (e) {}
+    }
     localStorage.removeItem('smartsend_token');
     localStorage.removeItem('smartsend_user');
     setToken(null);

@@ -4,7 +4,7 @@ import { generateToken } from '../middleware/authMiddleware.js';
 
 export async function login(req, res) {
   try {
-    const { email, password, autoRegister } = req.body;
+    const { email, password } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ error: 'Email and password are required.' });
@@ -14,35 +14,8 @@ export async function login(req, res) {
     const user = dbHelper.get('SELECT * FROM users WHERE email = ?', [normalizedEmail]);
     
     if (!user) {
-      if (autoRegister) {
-        // Auto-create account with their email
-        const derivedName = normalizedEmail.split('@')[0]
-          .replace(/[._-]/g, ' ')
-          .replace(/\b\w/g, c => c.toUpperCase());
-
-        const passwordHash = await bcrypt.hash(password, 10);
-        const result = dbHelper.run(
-          'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
-          [derivedName, normalizedEmail, passwordHash, 'user']
-        );
-
-        const newUser = {
-          id: result.lastInsertRowid,
-          name: derivedName,
-          email: normalizedEmail,
-          role: 'user'
-        };
-
-        const token = generateToken(newUser);
-        return res.status(201).json({
-          message: 'Account created and signed in successfully!',
-          token,
-          user: newUser
-        });
-      }
-
       return res.status(404).json({ 
-        error: 'No account found with this email.', 
+        error: 'No authorized account found with this email. Please contact your administrator.', 
         code: 'USER_NOT_FOUND' 
       });
     }
@@ -71,51 +44,10 @@ export async function login(req, res) {
 }
 
 export async function register(req, res) {
-  try {
-    const { name, email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email and password are required.' });
-    }
-
-    if (password.length < 4) {
-      return res.status(400).json({ error: 'Password should be at least 4 characters.' });
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    const existing = dbHelper.get('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
-    if (existing) {
-      return res.status(409).json({ error: 'An account with this email already exists. Please Sign In.' });
-    }
-
-    const displayName = (name && name.trim()) || normalizedEmail.split('@')[0]
-      .replace(/[._-]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase());
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const result = dbHelper.run(
-      'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
-      [displayName, normalizedEmail, passwordHash, 'user']
-    );
-
-    const newUser = {
-      id: result.lastInsertRowid,
-      name: displayName,
-      email: normalizedEmail,
-      role: 'user'
-    };
-
-    const token = generateToken(newUser);
-
-    return res.status(201).json({
-      message: 'Account registered successfully! Welcome.',
-      token,
-      user: newUser
-    });
-  } catch (err) {
-    console.error('Registration error:', err);
-    return res.status(500).json({ error: 'Failed to create user account.' });
-  }
+  return res.status(403).json({ 
+    error: 'Public registration is disabled. Only pre-configured administrators can access this workspace.',
+    code: 'REGISTRATION_DISABLED'
+  });
 }
 
 export function getCurrentUser(req, res) {
