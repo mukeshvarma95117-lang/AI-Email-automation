@@ -112,7 +112,7 @@ export default function Login() {
                 <div>
                   <p className="font-semibold">{errorMessage}</p>
                   <p className="text-[11px] text-rose-600/80 dark:text-rose-300/80 mt-0.5">
-                    Make sure you have added your admin account in the Supabase Auth dashboard.
+                    Access is restricted to the administrator (admin@smartsendai.online).
                   </p>
                 </div>
               </div>

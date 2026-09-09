@@ -4,18 +4,21 @@ import dbHelper from './db.js';
 export async function seedDatabase() {
   console.log('Seeding SmartSend AI database...');
 
-  // 1. Seed default admin user if not exists
-  const existingUser = dbHelper.get('SELECT * FROM users WHERE email = ?', ['admin@smartsend.ai']);
+  // 1. Seed admin user
+  const adminEmail = 'admin@smartsendai.online';
+  const existingUser = dbHelper.get('SELECT * FROM users WHERE email = ?', [adminEmail]);
   let adminId = existingUser?.id;
 
+  const passwordHash = await bcrypt.hash('Smartsend@123', 10);
   if (!existingUser) {
-    const passwordHash = await bcrypt.hash('admin123', 10);
     const result = dbHelper.run(
       'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
-      ['Admin User', 'admin@smartsend.ai', passwordHash, 'admin']
+      ['SmartSend Administrator', adminEmail, passwordHash, 'admin']
     );
     adminId = result.lastInsertRowid;
-    console.log('Created default admin user: admin@smartsend.ai (password: admin123)');
+    console.log('Created admin user: admin@smartsendai.online (password: Smartsend@123)');
+  } else {
+    dbHelper.run('UPDATE users SET password_hash = ? WHERE email = ?', [passwordHash, adminEmail]);
   }
 
   // 2. Seed groups

@@ -11,7 +11,27 @@ function handleMockFallback(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/auth/login')) {
-    throw new Error('Authentication is required. Please sign in with your administrator account.');
+    let email = '';
+    let password = '';
+    try {
+      if (options.body) {
+        const parsed = JSON.parse(options.body);
+        if (parsed.email) email = parsed.email.trim().toLowerCase();
+        if (parsed.password) password = parsed.password.trim();
+      }
+    } catch (e) {}
+
+    const isAdmin = (email === 'admin@smartsendai.online' || email === 'mukeshvarma95117@gmail.com') && password === 'Smartsend@123';
+    if (isAdmin) {
+      const user = { id: 1, name: 'SmartSend Administrator', email: 'admin@smartsendai.online', role: 'admin' };
+      return {
+        success: true,
+        token: 'smartsend_sec_' + Date.now(),
+        user
+      };
+    }
+
+    throw new Error('Access denied. Only the workspace administrator (admin@smartsendai.online) can sign in.');
   }
 
   if (endpoint.startsWith('/auth/me')) {
@@ -374,27 +394,28 @@ export const api = {
   login: async (credentials) => {
     const { email, password } = credentials || {};
     const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPassword = (password || '').trim();
 
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      throw new Error('Please enter a valid email address.');
+    if (!cleanEmail || !cleanPassword) {
+      throw new Error('Please enter both your email and password.');
     }
-    if (!password || password.length < 4) {
-      throw new Error('Please enter a password with at least 4 characters.');
-    }
+
+    const isAdminEmail = cleanEmail === 'admin@smartsendai.online' || cleanEmail === 'mukeshvarma95117@gmail.com';
+    const isMatchingPassword = cleanPassword === 'Smartsend@123';
 
     // 1. Direct Supabase Auth attempt if configured
     if (isSupabaseConfigured) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: cleanEmail,
-          password: password
+          password: cleanPassword
         });
 
         if (!error && data?.session && data?.user) {
           const user = {
             id: data.user.id,
-            name: data.user.user_metadata?.name || cleanEmail.split('@')[0],
-            email: data.user.email,
+            name: 'SmartSend Administrator',
+            email: 'admin@smartsendai.online',
             role: 'admin'
           };
           localStorage.setItem('smartsend_token', data.session.access_token);
@@ -410,27 +431,26 @@ export const api = {
       }
     }
 
-    // 2. Allow signing in with ANY email
-    const derivedName = cleanEmail.split('@')[0]
-      .replace(/[._-]/g, ' ')
-      .replace(/\b\w/g, c => c.toUpperCase());
+    // 2. Strict Administrator Validation
+    if (isAdminEmail && isMatchingPassword) {
+      const user = {
+        id: 'admin_1',
+        name: 'SmartSend Administrator',
+        email: 'admin@smartsendai.online',
+        role: 'admin'
+      };
+      const token = 'smartsend_sec_' + btoa('admin@smartsendai.online:' + Date.now());
+      localStorage.setItem('smartsend_token', token);
+      localStorage.setItem('smartsend_user', JSON.stringify(user));
+      return {
+        success: true,
+        token,
+        user
+      };
+    }
 
-    const user = {
-      id: 'admin_' + Date.now(),
-      name: derivedName || 'Workspace Admin',
-      email: cleanEmail,
-      role: 'admin'
-    };
-
-    const token = 'smartsend_auth_' + btoa(cleanEmail + ':' + Date.now());
-    localStorage.setItem('smartsend_token', token);
-    localStorage.setItem('smartsend_user', JSON.stringify(user));
-
-    return {
-      success: true,
-      token,
-      user
-    };
+    // 3. Deny any other credentials
+    throw new Error('Access denied. Only the workspace administrator (admin@smartsendai.online) can sign in.');
   },
   register: async () => {
     throw new Error('Public registration is disabled. Only authorized administrators can access this workspace.');

@@ -52,7 +52,7 @@ seedDatabase().then(() => {
   app.listen(PORT, () => {
     console.log(`=======================================================`);
     console.log(`🚀 SmartSend AI Server running on http://localhost:${PORT}`);
-    console.log(`🔐 Default admin login: admin@smartsend.ai / admin123`);
+    console.log(`🔐 Admin login: admin@smartsendai.online / Smartsend@123`);
     console.log(`=======================================================`);
   });
 }).catch(err => {
