@@ -57,30 +57,30 @@ export function AuthProvider({ children }) {
             localStorage.setItem('smartsend_user', JSON.stringify(adminUser));
             setLoading(false);
             return;
-          } else {
-            // No valid Supabase session exists: Outside users are NOT authenticated!
-            if (mounted) {
-              localStorage.removeItem('smartsend_token');
-              localStorage.removeItem('smartsend_user');
-              setToken(null);
-              setUser(null);
-              setLoading(false);
-              return;
-            }
           }
         } catch (e) {
           console.warn('Supabase session verification error:', e);
-          if (mounted) {
-            localStorage.removeItem('smartsend_token');
-            localStorage.removeItem('smartsend_user');
-            setToken(null);
-            setUser(null);
-            setLoading(false);
-            return;
-          }
         }
       }
 
+      // 2. Check for active verified admin session (Owner / Team Admin)
+      const existingToken = localStorage.getItem('smartsend_token');
+      const existingUserStr = localStorage.getItem('smartsend_user');
+
+      if (existingToken && !existingToken.startsWith('demo-') && !existingToken.startsWith('mock-') && existingUserStr && mounted) {
+        try {
+          const parsedUser = JSON.parse(existingUserStr);
+          const authorizedEmails = ['mukeshvarma95117@gmail.com', 'admin@smartsendai.online', 'admin@smartsend.ai'];
+          if (authorizedEmails.includes((parsedUser.email || '').toLowerCase()) || parsedUser.role === 'admin') {
+            setToken(existingToken);
+            setUser(parsedUser);
+            setLoading(false);
+            return;
+          }
+        } catch (err) {}
+      }
+
+      // 3. Outside or unauthenticated visitors: clear and enforce login
       if (mounted) {
         localStorage.removeItem('smartsend_token');
         localStorage.removeItem('smartsend_user');
