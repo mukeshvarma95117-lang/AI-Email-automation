@@ -21,7 +21,7 @@ function handleMockFallback(endpoint, options = {}) {
       }
     } catch (e) {}
 
-    const isAdmin = (email === 'admin@smartsendai.online' || email === 'mukeshvarma95117@gmail.com') && password === 'Smartsend@123';
+    const isAdmin = email === 'admin@smartsendai.online' && password === 'Smartsend@123';
     if (isAdmin) {
       const user = { id: 1, name: 'SmartSend Administrator', email: 'admin@smartsendai.online', role: 'admin' };
       return {
@@ -400,7 +400,7 @@ export const api = {
       throw new Error('Please enter both your email and password.');
     }
 
-    const isAdminEmail = cleanEmail === 'admin@smartsendai.online' || cleanEmail === 'mukeshvarma95117@gmail.com';
+    const isAdminEmail = cleanEmail === 'admin@smartsendai.online';
     const isMatchingPassword = cleanPassword === 'Smartsend@123';
 
     // 1. Direct Supabase Auth attempt if configured

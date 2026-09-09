@@ -70,7 +70,7 @@ export function AuthProvider({ children }) {
       if (existingToken && !existingToken.startsWith('demo-') && !existingToken.startsWith('mock-') && existingUserStr && mounted) {
         try {
           const parsedUser = JSON.parse(existingUserStr);
-          if (parsedUser && parsedUser.email) {
+          if (parsedUser && (parsedUser.email || '').toLowerCase() === 'admin@smartsendai.online') {
             setToken(existingToken);
             setUser(parsedUser);
             setLoading(false);
