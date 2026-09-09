@@ -643,7 +643,9 @@ export default function Settings() {
 
                 {showGmailGuide && (
                   <div className="pt-2 border-t border-slate-200 dark:border-slate-700 space-y-2 text-slate-600 dark:text-slate-300 text-[11px] leading-relaxed">
-                    <p>Google requires a 16-character <strong>App Password</strong> for automated mail dispatch:</p>
+                    <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-200 font-medium">
+                      ⚠️ <strong>Do NOT use your regular Gmail password:</strong> Google strictly rejects standard account passwords. You must generate a 16-character <strong>Google App Password</strong> below.
+                    </div>
                     <ol className="list-decimal pl-4 space-y-1.5">
                       <li>
                         Ensure <strong>2-Step Verification</strong> is enabled on your{' '}
@@ -666,10 +668,10 @@ export default function Settings() {
                         >
                           Google App Passwords <ExternalLink className="w-3 h-3" />
                         </a>
-                        , create an app password with name <strong>SmartSend AI</strong>.
+                        , create an app password named <strong>SmartSend AI</strong>.
                       </li>
                       <li>
-                        Copy the 16-character code, paste it into the <strong>SMTP Password</strong> field below, and click <strong>Save Preferences</strong>.
+                        Copy the 16-character code (e.g. <code>abcd efgh ijkl mnop</code>), paste it into the <strong>SMTP Password</strong> field below, and click <strong>Save Preferences</strong>.
                       </li>
                     </ol>
                   </div>

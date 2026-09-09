@@ -132,8 +132,16 @@ function buildHtmlEmail({ subject, body, cta }) {
 
 function parseDiagnosticError(err, host) {
   const msg = err.message || String(err);
-  if (msg.includes('535') || msg.toLowerCase().includes('username and password not accepted') || msg.toLowerCase().includes('badcredentials')) {
-    return `Authentication failed (535): Invalid username or password. For Gmail, you must enable 2-Step Verification and use a 16-character App Password (not your regular account password). Create one at: https://myaccount.google.com/apppasswords`;
+  if (
+    msg.includes('534') ||
+    msg.includes('535') ||
+    msg.toLowerCase().includes('application-specific password') ||
+    msg.toLowerCase().includes('invalid second factor') ||
+    msg.toLowerCase().includes('invalidsecondfactor') ||
+    msg.toLowerCase().includes('username and password not accepted') ||
+    msg.toLowerCase().includes('badcredentials')
+  ) {
+    return `Google App Password Required (534/535): Google does not accept your regular Gmail account password. You must enable 2-Step Verification and generate a 16-character App Password at: https://myaccount.google.com/apppasswords. Alternatively, switch to the 1-click Resend API in Settings!`;
   }
   if (msg.includes('ECONNREFUSED') || msg.includes('ETIMEDOUT') || msg.includes('ENOTFOUND')) {
     return `Connection failed to ${host}. Please check your SMTP host address and port (Port 465 with SSL, or 587 with TLS).`;

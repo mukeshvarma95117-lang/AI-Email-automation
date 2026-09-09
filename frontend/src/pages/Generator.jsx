@@ -87,8 +87,9 @@ export default function Generator() {
 
   // System mode state
   const [isDemoMode, setIsDemoMode] = useState(true);
+  const [emailProvider, setEmailProvider] = useState('resend');
   const [userSmtpEmail, setUserSmtpEmail] = useState('');
-  const [isSmtpConfigured, setIsSmtpConfigured] = useState(false);
+  const [isEmailConfigured, setIsEmailConfigured] = useState(false);
 
   // Contact preview switcher
   const [previewContactIndex, setPreviewContactIndex] = useState(0);
@@ -115,13 +116,15 @@ export default function Generator() {
         setGroups(groupsRes.groups || []);
         setContacts(contactsRes.contacts || []);
         if (settingsRes.settings) {
-          setIsDemoMode(settingsRes.settings.demo_mode === 'true');
-          setUserSmtpEmail(settingsRes.settings.email_user || '');
-          const hasSmtp = Boolean(
-            settingsRes.settings.email_user &&
-            (settingsRes.settings.email_pass || settingsRes.settings.email_pass_is_set)
-          );
-          setIsSmtpConfigured(hasSmtp);
+          const s = settingsRes.settings;
+          setIsDemoMode(s.demo_mode === 'true');
+          setUserSmtpEmail(s.email_user || '');
+          const provider = s.email_provider || 'resend';
+          setEmailProvider(provider);
+
+          const hasResend = Boolean(s.resend_api_key || s.resend_api_key_is_set);
+          const hasSmtp = Boolean(s.email_user && (s.email_pass || s.email_pass_is_set));
+          setIsEmailConfigured(provider === 'resend' ? hasResend : hasSmtp);
         }
 
         const initialGroupId = searchParams.get('group') || (groupsRes.groups?.[0]?.id ? String(groupsRes.groups[0].id) : '');
@@ -138,10 +141,14 @@ export default function Generator() {
       if (nextVal) {
         info('Switched to Demo Simulation Mode. Emails are simulated locally.', 'Demo Mode');
       } else {
-        if (channel === 'email' && !isSmtpConfigured) {
-          info('Switched to Live Delivery Mode. Note: Please enter your Gmail App Password in Settings to send live emails.', 'Live Mode Active');
+        if (channel === 'email' && !isEmailConfigured) {
+          if (emailProvider === 'resend') {
+            info('Switched to Live Delivery Mode. Note: Please configure your Resend API Key in Settings.', 'Live Mode Active');
+          } else {
+            info('Switched to Live Delivery Mode. Note: Please enter your Google App Password in Settings to send live emails.', 'Live Mode Active');
+          }
         } else {
-          success('Switched to Live Delivery Mode! Real emails will now be sent via SMTP.', 'Live Mode Active');
+          success(`Switched to Live Delivery Mode! Real emails will now be sent via ${emailProvider === 'resend' ? 'Resend Cloud API' : 'SMTP'}.`, 'Live Mode Active');
         }
       }
     } catch (err) {
@@ -548,12 +555,16 @@ export default function Generator() {
           </button>
         </div>
 
-        {!isDemoMode && channel === 'email' && !isSmtpConfigured && (
+        {!isDemoMode && channel === 'email' && !isEmailConfigured && (
           <div className="pt-2.5 mt-1 border-t border-emerald-200/70 dark:border-emerald-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-500/10 p-2.5 rounded-xl">
             <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium">
               <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
               <span>
-                <strong>SMTP Password Missing:</strong> Live email requires a 16-character Google App Password in Settings. Real delivery will fail until configured.
+                {emailProvider === 'resend' ? (
+                  <><strong>Resend API Key Missing:</strong> Live email requires a Resend API key in Settings.</>
+                ) : (
+                  <><strong>Google App Password Missing:</strong> Live email via Gmail requires a 16-character Google App Password in Settings (regular account passwords like "mukesh@2006" will fail).</>
+                )}
               </span>
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
@@ -1052,7 +1063,9 @@ export default function Generator() {
         missingTargets={missingTargets}
         isSending={isSending}
         isDemo={isDemoMode}
-        isSmtpConfigured={isSmtpConfigured}
+        emailProvider={emailProvider}
+        isEmailConfigured={isEmailConfigured}
+        isSmtpConfigured={isEmailConfigured}
         onSwitchToDemo={async () => {
           await handleToggleDemoMode();
         }}

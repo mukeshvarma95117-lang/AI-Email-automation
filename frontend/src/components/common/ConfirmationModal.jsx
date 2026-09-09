@@ -11,6 +11,8 @@ export default function ConfirmationModal({
   missingTargets = 0,
   isSending = false,
   isDemo = false,
+  emailProvider = 'resend',
+  isEmailConfigured = true,
   isSmtpConfigured = true,
   onSwitchToDemo,
   onOpenSettings
@@ -18,7 +20,10 @@ export default function ConfirmationModal({
   if (!isOpen) return null;
 
   const isLargeList = recipientCount > 50;
-  const isSmtpBlocked = channel === 'email' && !isDemo && !isSmtpConfigured;
+  // If emailConfigured prop is passed, use it, else fallback to isSmtpConfigured
+  const emailReady = isEmailConfigured !== undefined ? isEmailConfigured : isSmtpConfigured;
+  const isEmailBlocked = channel === 'email' && !isDemo && !emailReady;
+  const isResend = emailProvider === 'resend';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -35,7 +40,7 @@ export default function ConfirmationModal({
           <button
             onClick={onClose}
             disabled={isSending}
-            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg"
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1 rounded-lg cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -60,37 +65,41 @@ export default function ConfirmationModal({
                 <span>⚡ Live Delivery Mode</span>
               </span>
               <span className="text-[10px] bg-emerald-200/80 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                Real Outgoing SMTP
+                {isResend ? 'Real Resend Cloud API' : 'Real Outgoing SMTP'}
               </span>
             </div>
           )}
 
-          {/* SMTP App Password Required Warning */}
-          {isSmtpBlocked && (
+          {/* Email Provider Missing Credentials Warning */}
+          {isEmailBlocked && (
             <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700/80 text-amber-900 dark:text-amber-200 space-y-2.5">
               <div className="flex items-center gap-2 font-bold text-xs">
                 <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                <span>SMTP Password Not Configured</span>
+                <span>{isResend ? 'Resend API Key Not Configured' : 'Google App Password Required'}</span>
               </div>
               <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
-                Live email delivery requires your 16-character Google App Password in Settings. Sending now in Live Mode will fail.
+                {isResend ? (
+                  <>Live email delivery requires a Resend API key in Settings. Enter your key to send real emails to inboxes.</>
+                ) : (
+                  <>Gmail strictly does not accept your regular account password (e.g. "mukesh@2006"). You must generate a 16-character <strong>Google App Password</strong> in your Google Account Security settings.</>
+                )}
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1">
                 {onOpenSettings && (
                   <button
                     type="button"
                     onClick={onOpenSettings}
-                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] shadow-sm flex items-center gap-1 transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
                   >
                     <Settings className="w-3.5 h-3.5" />
-                    <span>Enter Password in Settings</span>
+                    <span>{isResend ? 'Enter API Key in Settings' : 'Enter App Password in Settings'}</span>
                   </button>
                 )}
                 {onSwitchToDemo && (
                   <button
                     type="button"
                     onClick={onSwitchToDemo}
-                    className="px-3 py-1.5 rounded-lg border border-amber-400 dark:border-amber-600 bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 font-semibold text-[11px] hover:bg-amber-100 dark:hover:bg-slate-700 transition-colors"
+                    className="px-3 py-1.5 rounded-lg border border-amber-400 dark:border-amber-600 bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 font-semibold text-[11px] hover:bg-amber-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                   >
                     Switch to Demo Mode
                   </button>
@@ -172,13 +181,13 @@ export default function ConfirmationModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={isSending || isSmtpBlocked}
+            disabled={isSending || isEmailBlocked}
             className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
           >
             {isSending ? (
               <span>Dispatching...</span>
-            ) : isSmtpBlocked ? (
-              <span>SMTP Password Required</span>
+            ) : isEmailBlocked ? (
+              <span>{isResend ? 'Resend Key Required' : 'App Password Required'}</span>
             ) : (
               <>
                 <Send className="w-3.5 h-3.5" />
