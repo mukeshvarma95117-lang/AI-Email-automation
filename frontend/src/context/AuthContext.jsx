@@ -63,15 +63,14 @@ export function AuthProvider({ children }) {
         }
       }
 
-      // 2. Check for active verified admin session (Owner / Team Admin)
+      // 2. Check for active authenticated user session
       const existingToken = localStorage.getItem('smartsend_token');
       const existingUserStr = localStorage.getItem('smartsend_user');
 
       if (existingToken && !existingToken.startsWith('demo-') && !existingToken.startsWith('mock-') && existingUserStr && mounted) {
         try {
           const parsedUser = JSON.parse(existingUserStr);
-          const authorizedEmails = ['mukeshvarma95117@gmail.com', 'admin@smartsendai.online', 'admin@smartsend.ai'];
-          if (authorizedEmails.includes((parsedUser.email || '').toLowerCase()) || parsedUser.role === 'admin') {
+          if (parsedUser && parsedUser.email) {
             setToken(existingToken);
             setUser(parsedUser);
             setLoading(false);

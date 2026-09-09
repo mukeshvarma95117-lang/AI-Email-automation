@@ -375,17 +375,14 @@ export const api = {
     const { email, password } = credentials || {};
     const cleanEmail = (email || '').trim().toLowerCase();
 
-    if (!cleanEmail || !password) {
-      throw new Error('Please enter both your email and password.');
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      throw new Error('Please enter a valid email address.');
+    }
+    if (!password || password.length < 4) {
+      throw new Error('Please enter a password with at least 4 characters.');
     }
 
-    const authorizedAdmins = [
-      'mukeshvarma95117@gmail.com',
-      'admin@smartsendai.online',
-      'admin@smartsend.ai'
-    ];
-
-    // 1. Direct Supabase Auth attempt
+    // 1. Direct Supabase Auth attempt if configured
     if (isSupabaseConfigured) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
@@ -396,7 +393,7 @@ export const api = {
         if (!error && data?.session && data?.user) {
           const user = {
             id: data.user.id,
-            name: data.user.user_metadata?.name || data.user.user_metadata?.full_name || cleanEmail.split('@')[0],
+            name: data.user.user_metadata?.name || cleanEmail.split('@')[0],
             email: data.user.email,
             role: 'admin'
           };
@@ -413,32 +410,27 @@ export const api = {
       }
     }
 
-    // 2. If Supabase has email confirmation pending or connection issues:
-    // Seamlessly authenticate the workspace owner / team admin
-    if (authorizedAdmins.includes(cleanEmail)) {
-      if (password.length < 4) {
-        throw new Error('Password must be at least 4 characters.');
-      }
+    // 2. Allow signing in with ANY email
+    const derivedName = cleanEmail.split('@')[0]
+      .replace(/[._-]/g, ' ')
+      .replace(/\b\w/g, c => c.toUpperCase());
 
-      const displayName = cleanEmail === 'mukeshvarma95117@gmail.com' ? 'Mukesh Varma' : 'Admin User';
-      const user = {
-        id: 'admin-' + Date.now(),
-        name: displayName,
-        email: cleanEmail,
-        role: 'admin'
-      };
-      const token = 'smartsend_sec_' + btoa(cleanEmail + ':' + Date.now());
-      localStorage.setItem('smartsend_token', token);
-      localStorage.setItem('smartsend_user', JSON.stringify(user));
-      return {
-        success: true,
-        token,
-        user
-      };
-    }
+    const user = {
+      id: 'admin_' + Date.now(),
+      name: derivedName || 'Workspace Admin',
+      email: cleanEmail,
+      role: 'admin'
+    };
 
-    // 3. Reject all external / unauthorized users
-    throw new Error('Invalid login credentials. This workspace is restricted to authorized team members.');
+    const token = 'smartsend_auth_' + btoa(cleanEmail + ':' + Date.now());
+    localStorage.setItem('smartsend_token', token);
+    localStorage.setItem('smartsend_user', JSON.stringify(user));
+
+    return {
+      success: true,
+      token,
+      user
+    };
   },
   register: async () => {
     throw new Error('Public registration is disabled. Only authorized administrators can access this workspace.');
