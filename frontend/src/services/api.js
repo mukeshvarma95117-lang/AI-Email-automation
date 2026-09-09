@@ -11,28 +11,7 @@ function handleMockFallback(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/auth/login')) {
-    let email = '';
-    let password = '';
-    try {
-      if (options.body) {
-        const parsed = JSON.parse(options.body);
-        if (parsed.email) email = parsed.email.trim().toLowerCase();
-        if (parsed.password) password = parsed.password;
-      }
-    } catch (e) {}
-
-    // Allow Demo Admin account in mock/offline mode
-    if (email === 'admin@smartsend.ai' && password === 'admin123') {
-      const mockUser = { id: 1, name: 'Admin User', email: 'admin@smartsend.ai', role: 'admin' };
-      return {
-        success: true,
-        token: 'demo-token-' + Date.now(),
-        user: mockUser,
-        isDemo: true
-      };
-    }
-
-    throw new Error('Invalid email or password. Please verify your admin credentials.');
+    throw new Error('Authentication is required. Please sign in with your administrator account.');
   }
 
   if (endpoint.startsWith('/auth/me')) {
@@ -396,46 +375,41 @@ export const api = {
     const { email, password } = credentials || {};
     const cleanEmail = (email || '').trim();
 
-    // 1. Direct Supabase Auth (Priority: Admin account created in Supabase Dashboard)
-    if (isSupabaseConfigured && cleanEmail && password) {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: password
-        });
-
-        if (error) {
-          // If demo admin credentials, allow passing through to local/mock handler
-          if (cleanEmail.toLowerCase() === 'admin@smartsend.ai' && password === 'admin123') {
-            console.log('Using demo admin bypass...');
-          } else {
-            throw new Error(error.message || 'Invalid email or password.');
-          }
-        } else if (data?.session && data?.user) {
-          const user = {
-            id: data.user.id,
-            name: data.user.user_metadata?.name || data.user.user_metadata?.full_name || cleanEmail.split('@')[0],
-            email: data.user.email,
-            role: 'admin'
-          };
-          localStorage.setItem('smartsend_token', data.session.access_token);
-          localStorage.setItem('smartsend_user', JSON.stringify(user));
-          return {
-            success: true,
-            token: data.session.access_token,
-            user
-          };
-        }
-      } catch (err) {
-        // If Supabase gave an explicit authentication error, propagate it
-        if (err.message && !err.message.includes('fetch') && !err.message.includes('Failed to fetch')) {
-          throw err;
-        }
-        console.warn('Supabase Auth connection error, checking local/fallback:', err);
-      }
+    if (!cleanEmail || !password) {
+      throw new Error('Please enter both your email and password.');
     }
 
-    // 2. Fall back to backend /auth/login (or mock demo admin)
+    // 1. Direct Supabase Auth (Strict requirement: outside users must authenticate via Supabase)
+    if (isSupabaseConfigured) {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: cleanEmail,
+        password: password
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Invalid email or password.');
+      }
+
+      if (data?.session && data?.user) {
+        const user = {
+          id: data.user.id,
+          name: data.user.user_metadata?.name || data.user.user_metadata?.full_name || cleanEmail.split('@')[0],
+          email: data.user.email,
+          role: 'admin'
+        };
+        localStorage.setItem('smartsend_token', data.session.access_token);
+        localStorage.setItem('smartsend_user', JSON.stringify(user));
+        return {
+          success: true,
+          token: data.session.access_token,
+          user
+        };
+      }
+
+      throw new Error('Authentication failed. Please check your credentials.');
+    }
+
+    // 2. Fall back to backend /auth/login only if Supabase is unconfigured
     return request('/auth/login', { method: 'POST', body: JSON.stringify(credentials) });
   },
   register: async () => {

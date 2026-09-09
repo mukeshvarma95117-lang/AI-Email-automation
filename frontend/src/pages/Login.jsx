@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -13,17 +13,16 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const { login } = useAuth();
+  const { login, isAuthenticated } = useAuth();
   const { toggleTheme, isDark } = useTheme();
   const { success, error, info } = useToast();
   const navigate = useNavigate();
 
-  const handleFillDemo = () => {
-    setEmail('admin@smartsend.ai');
-    setPassword('admin123');
-    setErrorMessage('');
-    info('Demo admin credentials loaded. Click Sign In to access the workspace.', 'Demo Loaded');
-  };
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
@@ -206,27 +205,6 @@ export default function Login() {
                 )}
               </button>
             </form>
-
-            {/* Quick Demo Option for local testing */}
-            <div className="relative my-5 flex items-center justify-center">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
-              </div>
-              <span className="relative bg-white dark:bg-[#141820] px-3 text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
-                Developer / Testing
-              </span>
-            </div>
-
-            <button
-              type="button"
-              onClick={handleFillDemo}
-              className="w-full py-2.5 px-3 rounded-xl bg-[#f2f4f7] dark:bg-slate-800/60 hover:bg-[#e9ecf0] dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 text-xs font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer border border-transparent hover:border-slate-300 dark:hover:border-slate-700"
-            >
-              <div className="w-4 h-4 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold">
-                ⚡
-              </div>
-              <span>Load Demo Admin Account</span>
-            </button>
           </div>
 
           {/* Security Notice Footer */}

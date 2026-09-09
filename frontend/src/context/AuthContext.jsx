@@ -5,16 +5,33 @@ import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('smartsend_user');
+  // Purge any legacy demo or mock tokens from previous app versions
+  const cleanInitialSession = () => {
     try {
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return null;
-  });
+      const savedToken = localStorage.getItem('smartsend_token');
+      if (savedToken && (savedToken.startsWith('demo-') || savedToken.startsWith('mock-'))) {
+        localStorage.removeItem('smartsend_token');
+        localStorage.removeItem('smartsend_user');
+        return null;
+      }
+      return savedToken || null;
+    } catch {
+      return null;
+    }
+  };
 
-  const [token, setToken] = useState(() => {
-    return localStorage.getItem('smartsend_token') || null;
+  const [token, setToken] = useState(() => cleanInitialSession());
+  const [user, setUser] = useState(() => {
+    try {
+      const savedToken = localStorage.getItem('smartsend_token');
+      if (!savedToken || savedToken.startsWith('demo-') || savedToken.startsWith('mock-')) {
+        return null;
+      }
+      const savedUser = localStorage.getItem('smartsend_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
   });
 
   const [loading, setLoading] = useState(true);
@@ -23,11 +40,11 @@ export function AuthProvider({ children }) {
     let mounted = true;
 
     async function initAuth() {
-      // 1. Check Supabase Auth session if configured
+      // Strictly verify authentication with Supabase
       if (isSupabaseConfigured) {
         try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.user && mounted) {
+          const { data: { session }, error } = await supabase.auth.getSession();
+          if (session?.user && session?.access_token && mounted) {
             const adminUser = {
               id: session.user.id,
               name: session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
@@ -40,38 +57,47 @@ export function AuthProvider({ children }) {
             localStorage.setItem('smartsend_user', JSON.stringify(adminUser));
             setLoading(false);
             return;
+          } else {
+            // No valid Supabase session exists: Outside users are NOT authenticated!
+            if (mounted) {
+              localStorage.removeItem('smartsend_token');
+              localStorage.removeItem('smartsend_user');
+              setToken(null);
+              setUser(null);
+              setLoading(false);
+              return;
+            }
           }
         } catch (e) {
-          console.warn('Supabase session check error:', e);
+          console.warn('Supabase session verification error:', e);
+          if (mounted) {
+            localStorage.removeItem('smartsend_token');
+            localStorage.removeItem('smartsend_user');
+            setToken(null);
+            setUser(null);
+            setLoading(false);
+            return;
+          }
         }
       }
 
-      // 2. Check existing local token
-      const existingToken = localStorage.getItem('smartsend_token');
-      if (existingToken && mounted) {
-        setToken(existingToken);
-        const existingUser = localStorage.getItem('smartsend_user');
-        if (existingUser) {
-          try {
-            setUser(JSON.parse(existingUser));
-          } catch {}
-        }
-      } else if (mounted) {
+      if (mounted) {
+        localStorage.removeItem('smartsend_token');
+        localStorage.removeItem('smartsend_user');
         setToken(null);
         setUser(null);
+        setLoading(false);
       }
-
-      if (mounted) setLoading(false);
     }
 
     initAuth();
 
-    // Listen to Supabase auth state changes (e.g. sign in, sign out, token refresh)
+    // Listen to Supabase auth state changes
     let authSubscription = null;
     if (isSupabaseConfigured) {
       const { data } = supabase.auth.onAuthStateChange((event, session) => {
         if (!mounted) return;
-        if (event === 'SIGNED_IN' && session?.user) {
+        if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user && session?.access_token) {
           const adminUser = {
             id: session.user.id,
             name: session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
@@ -125,8 +151,10 @@ export function AuthProvider({ children }) {
     setUser(null);
   };
 
+  const isAuthenticated = Boolean(token && !token.startsWith('demo-') && !token.startsWith('mock-'));
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, isAuthenticated: Boolean(token) }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );
