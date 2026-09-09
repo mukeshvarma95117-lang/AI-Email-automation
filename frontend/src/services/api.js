@@ -292,13 +292,39 @@ function handleMockFallback(endpoint, options = {}) {
   if (endpoint.startsWith('/messages/send')) {
     let isDemo = false;
     let recipientCount = 1;
+    let target = 'mukeshvarma95117@gmail.com';
+    let subject = 'Workspace Announcement';
+    let body = 'Hi there, your message has been dispatched successfully.';
+    let channel = 'email';
     try {
       if (options.body) {
         const parsed = JSON.parse(options.body);
         if (parsed.isDemo !== undefined) isDemo = Boolean(parsed.isDemo);
         else if (parsed.demo_mode !== undefined) isDemo = parsed.demo_mode === 'true';
         if (Array.isArray(parsed.recipientIds)) recipientCount = parsed.recipientIds.length || 1;
+        if (parsed.channel) channel = parsed.channel;
+        if (parsed.subject) subject = parsed.subject;
+        if (parsed.body) body = parsed.body;
+        if (parsed.customRecipients?.[0]?.email) target = parsed.customRecipients[0].email;
       }
+    } catch (e) {}
+
+    try {
+      const existing = localStorage.getItem('smartsend_delivery_logs');
+      const logs = existing ? JSON.parse(existing) : [];
+      logs.unshift({
+        id: Date.now(),
+        channel,
+        contact_name: 'Recipient',
+        contact_target: target,
+        rendered_subject: subject,
+        rendered_body: body,
+        status: isDemo ? 'Demo Sent' : 'Sent',
+        is_demo: isDemo ? 1 : 0,
+        error_message: isDemo ? 'Delivered via Demo Simulation' : 'Live Delivery',
+        delivery_timestamp: new Date().toISOString()
+      });
+      localStorage.setItem('smartsend_delivery_logs', JSON.stringify(logs.slice(0, 100)));
     } catch (e) {}
 
     return {
@@ -433,13 +459,28 @@ export const api = {
 
     // 2. Strict Administrator Validation
     if (isAdminEmail && isMatchingPassword) {
-      const user = {
+      let user = {
         id: 'admin_1',
         name: 'SmartSend Administrator',
         email: 'admin@smartsendai.online',
         role: 'admin'
       };
-      const token = 'smartsend_sec_' + btoa('admin@smartsendai.online:' + Date.now());
+      let token = 'smartsend_sec_' + btoa('admin@smartsendai.online:' + Date.now());
+
+      // Attempt to authenticate with backend if running to get full JWT token
+      try {
+        const resp = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, password: cleanPassword })
+        });
+        if (resp.ok) {
+          const bData = await resp.json();
+          if (bData.token) token = bData.token;
+          if (bData.user) user = bData.user;
+        }
+      } catch (e) {}
+
       localStorage.setItem('smartsend_token', token);
       localStorage.setItem('smartsend_user', JSON.stringify(user));
       return {
@@ -677,6 +718,37 @@ export const api = {
     // If local backend or custom backend URL is configured, use backend API
     if (isLocal || hasCustomApiUrl) {
       const res = await request('/messages/send', { method: 'POST', body: JSON.stringify(payload) });
+      if (res && res.success) {
+        try {
+          const deliveryList = Array.isArray(res.deliveryResults) && res.deliveryResults.length > 0
+            ? res.deliveryResults
+            : [{
+                contact_name: data.customRecipients?.[0]?.name || 'Recipient',
+                target: data.customRecipients?.[0]?.email || 'mukeshvarma95117@gmail.com',
+                renderedSubject: data.subject || '',
+                renderedBody: data.body || '',
+                status: isDemo ? 'Demo Sent' : 'Sent',
+                isDemo
+              }];
+          const existing = localStorage.getItem('smartsend_delivery_logs');
+          const logs = existing ? JSON.parse(existing) : [];
+          for (const item of deliveryList) {
+            logs.unshift({
+              id: Date.now() + Math.floor(Math.random() * 1000),
+              channel: data.channel || 'email',
+              contact_name: item.contactName || item.contact_name || 'Recipient',
+              contact_target: item.target || item.contact_target || '',
+              rendered_subject: item.renderedSubject || data.subject,
+              rendered_body: item.renderedBody || data.body,
+              status: item.status || (isDemo ? 'Demo Sent' : 'Sent'),
+              is_demo: isDemo ? 1 : 0,
+              error_message: isDemo ? 'Delivered via Demo Simulation' : 'Live Delivery',
+              delivery_timestamp: new Date().toISOString()
+            });
+          }
+          localStorage.setItem('smartsend_delivery_logs', JSON.stringify(logs.slice(0, 100)));
+        } catch (e) {}
+      }
       return res;
     }
 
@@ -880,6 +952,23 @@ export const api = {
     return request('/messages/scheduled/clear-cancelled', { method: 'DELETE' });
   },
   getDeliveryLogs: async (params = {}) => {
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const hasCustomApiUrl = Boolean(import.meta.env.VITE_API_URL);
+
+    // 1. If running locally or with dedicated backend, query backend API first
+    if (isLocal || hasCustomApiUrl) {
+      try {
+        const qs = new URLSearchParams(params).toString();
+        const res = await request(`/messages/logs${qs ? `?${qs}` : ''}`);
+        if (res && Array.isArray(res.logs)) {
+          return res;
+        }
+      } catch (e) {
+        console.warn('Backend getDeliveryLogs error:', e);
+      }
+    }
+
+    // 2. Query Supabase message_logs if configured
     if (isSupabaseConfigured) {
       try {
         let query = supabase.from('message_logs').select('*').order('id', { ascending: false });
@@ -894,16 +983,20 @@ export const api = {
       }
     }
 
+    // 3. Query localStorage delivery logs
     try {
       const saved = localStorage.getItem('smartsend_delivery_logs');
       if (saved) {
         let logs = JSON.parse(saved);
-        if (params.channel && params.channel !== 'all') logs = logs.filter(l => l.channel === params.channel);
-        if (params.status && params.status !== 'all') logs = logs.filter(l => l.status === params.status);
-        return { logs, total: logs.length };
+        if (Array.isArray(logs) && logs.length > 0) {
+          if (params.channel && params.channel !== 'all') logs = logs.filter(l => l.channel === params.channel);
+          if (params.status && params.status !== 'all') logs = logs.filter(l => l.status === params.status);
+          return { logs, total: logs.length };
+        }
       }
     } catch (e) {}
 
+    // 4. Fallback request
     const qs = new URLSearchParams(params).toString();
     return request(`/messages/logs${qs ? `?${qs}` : ''}`);
   },
