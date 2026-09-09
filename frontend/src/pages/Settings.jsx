@@ -39,7 +39,7 @@ export default function Settings() {
     llm_api_key: '',
     email_provider: 'resend',
     resend_api_key: '',
-    resend_from: 'SmartSend AI <onboarding@resend.dev>',
+    resend_from: 'SmartSend AI <notifications@smartsendai.online>',
     email_host: 'smtp.gmail.com',
     email_port: '587',
     email_user: '',
@@ -570,20 +570,20 @@ export default function Settings() {
                   <label className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">Sender "From" Address</label>
                   <input
                     type="text"
-                    placeholder="SmartSend AI <onboarding@resend.dev>"
+                    placeholder="SmartSend AI <notifications@smartsendai.online>"
                     value={settings.resend_from}
                     onChange={e => handleChange('resend_from', e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs"
                   />
-                  <p className="text-[10px] text-slate-400">Use <code className="font-mono">onboarding@resend.dev</code> for testing, or your verified custom domain from <a href="https://resend.com/domains" target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 underline font-medium">resend.com/domains</a>.</p>
+                  <p className="text-[10px] text-slate-400">Default: <code className="font-mono">SmartSend AI &lt;notifications@smartsendai.online&gt;</code> (Verified GoDaddy Custom Domain), or manage domains at <a href="https://resend.com/domains" target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 underline font-medium">resend.com/domains</a>.</p>
                 </div>
               </div>
 
-              {/* Helpful Sandbox Notice */}
+              {/* Helpful Domain Notice */}
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700/80 text-[11px] text-slate-600 dark:text-slate-300 flex items-start gap-2.5">
                 <HelpCircle className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
                 <div className="leading-relaxed">
-                  <strong>Resend Free Sandbox Note:</strong> With the default <code className="font-mono bg-slate-200 dark:bg-slate-700 px-1 py-0.5 rounded text-[10px]">onboarding@resend.dev</code> sender, Resend delivers live emails directly to your registered account email (e.g. <span className="font-semibold text-slate-900 dark:text-white">mukeshvarma95117@gmail.com</span>). To deliver emails to any person in the world, simply add your custom domain at <a href="https://resend.com/domains" target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 underline font-semibold">resend.com/domains</a>.
+                  <strong>Custom Domain Active:</strong> Resend is configured to send from your custom domain <span className="font-semibold text-slate-900 dark:text-white">smartsendai.online</span>! Emails deliver reliably worldwide. If you switch senders or domains, make sure the domain is verified at <a href="https://resend.com/domains" target="_blank" rel="noreferrer" className="text-indigo-600 dark:text-indigo-400 underline font-semibold">resend.com/domains</a>.
                 </div>
               </div>
             </div>

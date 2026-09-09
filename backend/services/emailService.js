@@ -4,7 +4,7 @@ import dbHelper from '../database/db.js';
 export function getEmailConfig() {
   const provider = dbHelper.get("SELECT value FROM settings WHERE key = 'email_provider'")?.value || 'resend';
   const resendApiKey = dbHelper.get("SELECT value FROM settings WHERE key = 'resend_api_key'")?.value || '';
-  const resendFrom = dbHelper.get("SELECT value FROM settings WHERE key = 'resend_from'")?.value || 'SmartSend AI <onboarding@resend.dev>';
+  const resendFrom = dbHelper.get("SELECT value FROM settings WHERE key = 'resend_from'")?.value || 'SmartSend AI <notifications@smartsendai.online>';
 
   const host = dbHelper.get("SELECT value FROM settings WHERE key = 'email_host'")?.value || 'smtp.gmail.com';
   const port = dbHelper.get("SELECT value FROM settings WHERE key = 'email_port'")?.value || '587';
@@ -163,7 +163,7 @@ export async function sendViaResend({ to, subject, body, isHtml = false, cta = '
     };
   }
 
-  const rawFrom = config.resendFrom || 'SmartSend AI <onboarding@resend.dev>';
+  const rawFrom = config.resendFrom || 'SmartSend AI <notifications@smartsendai.online>';
   const from = rawFrom.includes('<') ? rawFrom : `SmartSend AI <${rawFrom}>`;
   const htmlContent = isHtml ? body : buildHtmlEmail({ subject, body, cta });
 

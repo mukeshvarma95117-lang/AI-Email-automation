@@ -118,7 +118,7 @@ function handleMockFallback(endpoint, options = {}) {
         email_provider: 'resend',
         resend_api_key: '',
         resend_api_key_is_set: true,
-        resend_from: 'SmartSend AI <onboarding@resend.dev>',
+        resend_from: 'SmartSend AI <notifications@smartsendai.online>',
         email_host: 'smtp.gmail.com',
         email_port: '587',
         email_user: 'mukeshvarma95117@gmail.com',

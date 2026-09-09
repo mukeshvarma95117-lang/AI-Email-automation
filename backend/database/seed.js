@@ -260,7 +260,7 @@ export async function seedDatabase() {
     { key: 'llm_api_key', value: '' },
     { key: 'email_provider', value: 'resend' },
     { key: 'resend_api_key', value: '' },
-    { key: 'resend_from', value: 'SmartSend AI <onboarding@resend.dev>' },
+    { key: 'resend_from', value: 'SmartSend AI <notifications@smartsendai.online>' },
     { key: 'email_host', value: 'smtp.gmail.com' },
     { key: 'email_port', value: '587' },
     { key: 'email_user', value: '' },
