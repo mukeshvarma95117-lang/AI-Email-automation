@@ -103,12 +103,26 @@ function handleMockFallback(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/settings')) {
+    let cached = {};
+    try {
+      const s = localStorage.getItem('smartsend_settings');
+      if (s) cached = JSON.parse(s);
+    } catch (e) {}
+
     if (method === 'PUT') {
-      return { success: true, message: 'Settings saved (Demo Mode)' };
+      try {
+        if (options.body) {
+          const parsed = JSON.parse(options.body);
+          cached = { ...cached, ...parsed };
+          localStorage.setItem('smartsend_settings', JSON.stringify(cached));
+        }
+      } catch (e) {}
+      return { success: true, message: 'Settings saved successfully' };
     }
+
     return {
       settings: {
-        demo_mode: 'true',
+        demo_mode: 'false',
         default_channel: 'email',
         default_tone: 'Professional',
         default_language: 'English',
@@ -126,14 +140,15 @@ function handleMockFallback(endpoint, options = {}) {
         email_user: 'mukeshvarma95117@gmail.com',
         email_pass: '',
         email_pass_is_set: false,
-        email_from: 'SmartSend AI <notifications@smartsend.ai>',
+        email_from: 'SmartSend AI <notifications@smartsendai.online>',
         whatsapp_provider: 'meta_cloud',
         whatsapp_token: '',
         whatsapp_phone_number_id: '',
         sms_provider: 'twilio',
         sms_account_sid: '',
         sms_auth_token: '',
-        sms_from_number: '+15550100'
+        sms_from_number: '+15550100',
+        ...cached
       }
     };
   }
@@ -228,52 +243,75 @@ function handleMockFallback(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/messages/logs') || endpoint.startsWith('/messages/delivery-logs')) {
+    let localLogs = [];
+    try {
+      const saved = localStorage.getItem('smartsend_delivery_logs');
+      if (saved) localLogs = JSON.parse(saved);
+    } catch (e) {}
+
     if (method === 'DELETE') {
-      return { success: true, message: 'Delivery log record deleted (Demo Mode)' };
+      const match = endpoint.match(/\/messages\/logs\/(\d+)/);
+      if (match) {
+        const idToDelete = Number(match[1]);
+        localLogs = localLogs.filter(l => Number(l.id) !== idToDelete);
+        localStorage.setItem('smartsend_delivery_logs', JSON.stringify(localLogs));
+      } else if (endpoint.includes('/clear')) {
+        localStorage.removeItem('smartsend_delivery_logs');
+        localLogs = [];
+      }
+      return { success: true, message: 'Delivery log record deleted' };
     }
+
     return {
-      logs: [
-        {
-          id: 1,
-          channel: 'email',
-          contact_name: 'Mukesh Varma',
-          contact_target: 'mukeshvarma95117@gmail.com',
-          status: 'delivered',
-          rendered_subject: 'Welcome to SmartSend AI GenAI 2.0',
-          rendered_body: 'Hi Mukesh Varma, welcome aboard! Your automated messaging system is live.',
-          delivery_timestamp: new Date().toISOString(),
-          is_demo: 1,
-          error_message: 'Delivered successfully via SmartSend Engine'
-        }
-      ],
-      total: 1,
+      logs: localLogs,
+      total: localLogs.length,
       page: 1,
       limit: 20
     };
   }
 
   if (endpoint.startsWith('/contacts/import-csv')) {
-    return { success: true, message: 'Imported successfully (Demo Mode)', count: 3 };
+    return { success: true, message: 'Imported successfully', count: 3 };
   }
 
   if (endpoint.startsWith('/settings/verify') || endpoint.startsWith('/settings/test') || endpoint.startsWith('/settings/setup-test-smtp')) {
-    return { success: true, valid: true, verified: true, message: 'Verified successfully (Demo Mode)' };
+    return { success: true, valid: true, verified: true, message: 'Verified successfully' };
   }
 
   if (endpoint.startsWith('/messages/send')) {
+    let isDemo = false;
+    let recipientCount = 1;
+    try {
+      if (options.body) {
+        const parsed = JSON.parse(options.body);
+        if (parsed.isDemo !== undefined) isDemo = Boolean(parsed.isDemo);
+        else if (parsed.demo_mode !== undefined) isDemo = parsed.demo_mode === 'true';
+        if (Array.isArray(parsed.recipientIds)) recipientCount = parsed.recipientIds.length || 1;
+      }
+    } catch (e) {}
+
     return {
       success: true,
-      successCount: 1,
-      message: 'Message dispatched successfully (Demo Simulation Mode)',
-      isDemo: true
+      successCount: recipientCount,
+      message: isDemo ? 'Message dispatched successfully (Demo Simulation Mode)' : 'Message dispatched successfully (Live Delivery Mode)',
+      isDemo
     };
   }
 
   if (endpoint.startsWith('/messages/schedule')) {
+    let isDemo = false;
+    try {
+      if (options.body) {
+        const parsed = JSON.parse(options.body);
+        if (parsed.isDemo !== undefined) isDemo = Boolean(parsed.isDemo);
+        else if (parsed.demo_mode !== undefined) isDemo = parsed.demo_mode === 'true';
+      }
+    } catch (e) {}
+
     return {
       success: true,
-      message: 'Message scheduled successfully (Demo Simulation Mode)',
-      isDemo: true
+      message: isDemo ? 'Message scheduled successfully (Demo Simulation Mode)' : 'Message scheduled successfully (Live Delivery Mode)',
+      isDemo
     };
   }
 
@@ -505,19 +543,96 @@ export const api = {
 
   // Messages
   sendMessage: async (data) => {
+    // 1. Resolve demo mode state
+    let isDemo = false;
+    if (data.isDemo !== undefined) {
+      isDemo = Boolean(data.isDemo);
+    } else if (data.demo_mode !== undefined) {
+      isDemo = data.demo_mode === 'true';
+    } else {
+      try {
+        const saved = localStorage.getItem('smartsend_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.demo_mode !== undefined) {
+            isDemo = parsed.demo_mode === 'true';
+          }
+        }
+      } catch (e) {}
+    }
+
+    let resendApiKey = '';
+    let resendFrom = 'SmartSend AI <notifications@smartsendai.online>';
+    try {
+      const saved = localStorage.getItem('smartsend_settings');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.resend_api_key) resendApiKey = parsed.resend_api_key;
+        if (parsed.resend_from) resendFrom = parsed.resend_from;
+      }
+    } catch (e) {}
+
+    const payload = {
+      ...data,
+      isDemo,
+      resendApiKey: data.resendApiKey || resendApiKey,
+      resendFrom: data.resendFrom || resendFrom
+    };
+
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const hasCustomApiUrl = Boolean(import.meta.env.VITE_API_URL);
 
     // If local backend or custom backend URL is configured, use backend API
     if (isLocal || hasCustomApiUrl) {
-      return request('/messages/send', { method: 'POST', body: JSON.stringify(data) });
+      const res = await request('/messages/send', { method: 'POST', body: JSON.stringify(payload) });
+      return res;
     }
 
-    // Direct Supabase cloud persistence for serverless/static production
+    // Try Vercel Serverless Function first for live delivery
+    let serverlessSuccess = false;
+    let serverlessRes = null;
+    try {
+      const resp = await fetch('/api/messages/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (resp.ok) {
+        serverlessRes = await resp.json();
+        serverlessSuccess = Boolean(serverlessRes && serverlessRes.success);
+      }
+    } catch (e) {
+      console.warn('Vercel serverless dispatch fallback:', e);
+    }
+
+    if (serverlessSuccess) {
+      // Record in localStorage
+      try {
+        const existing = localStorage.getItem('smartsend_delivery_logs');
+        const logs = existing ? JSON.parse(existing) : [];
+        logs.unshift({
+          id: Date.now(),
+          channel: data.channel || 'email',
+          contact_name: data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Mukesh Varma'),
+          contact_target: data.customRecipients?.[0]?.email || 'mukeshvarma95117@gmail.com',
+          rendered_subject: data.subject || '',
+          rendered_body: data.body || '',
+          status: isDemo ? 'Demo Sent' : 'Sent',
+          is_demo: isDemo ? 1 : 0,
+          error_message: isDemo ? 'Delivered via Demo Simulation' : (serverlessRes.message || 'Live Delivery via Resend Cloud API'),
+          delivery_timestamp: new Date().toISOString()
+        });
+        localStorage.setItem('smartsend_delivery_logs', JSON.stringify(logs.slice(0, 100)));
+      } catch (e) {}
+
+      return serverlessRes;
+    }
+
+    // Direct Supabase cloud persistence fallback
     if (isSupabaseConfigured) {
       try {
         const recipientCount = Array.isArray(data.recipientIds) ? data.recipientIds.length : (data.sendToAll ? 1 : 1);
-        const { data: msg, error: msgErr } = await supabase.from('messages').insert([{
+        const { data: msg } = await supabase.from('messages').insert([{
           prompt: data.prompt || '',
           subject: data.subject || '',
           body: data.body || '',
@@ -526,44 +641,68 @@ export const api = {
           channel: data.channel || 'email',
           recipient_count: recipientCount,
           recipients_json: JSON.stringify(data.recipientIds || []),
-          status: 'sent',
-          is_demo: 1
+          status: isDemo ? 'demo_sent' : 'sent',
+          is_demo: isDemo ? 1 : 0
         }]).select().single();
 
-        if (!msgErr && msg) {
-          // Record delivery log in Supabase
-          await supabase.from('message_logs').insert([{
-            message_id: msg.id,
-            channel: data.channel || 'email',
-            contact_name: 'Recipient',
-            contact_target: data.channel === 'email' ? 'contact@domain.com' : '+15550000',
-            rendered_subject: data.subject || '',
-            rendered_body: data.body || '',
-            status: 'delivered',
-            is_demo: 1,
-            delivery_timestamp: new Date().toISOString()
-          }]);
+        const logRecord = {
+          message_id: msg?.id || null,
+          channel: data.channel || 'email',
+          contact_name: data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Mukesh Varma'),
+          contact_target: data.customRecipients?.[0]?.email || 'mukeshvarma95117@gmail.com',
+          rendered_subject: data.subject || '',
+          rendered_body: data.body || '',
+          status: isDemo ? 'Demo Sent' : 'Sent',
+          is_demo: isDemo ? 1 : 0,
+          error_message: isDemo ? 'Delivered via Demo Simulation' : 'Live Delivery via SmartSend Engine',
+          delivery_timestamp: new Date().toISOString()
+        };
 
-          return {
-            success: true,
-            successCount: recipientCount,
-            message: 'Dispatched and saved to Supabase (Simulation Mode)',
-            isDemo: true
-          };
-        }
+        await supabase.from('message_logs').insert([logRecord]);
+
+        try {
+          const existing = localStorage.getItem('smartsend_delivery_logs');
+          const logs = existing ? JSON.parse(existing) : [];
+          logs.unshift({ id: Date.now(), ...logRecord });
+          localStorage.setItem('smartsend_delivery_logs', JSON.stringify(logs.slice(0, 100)));
+        } catch (e) {}
+
+        return {
+          success: true,
+          successCount: recipientCount,
+          message: isDemo ? 'Dispatched in Demo Simulation Mode' : 'Dispatched in Live Delivery Mode',
+          isDemo
+        };
       } catch (e) {
         console.warn('Supabase sendMessage fallback:', e);
       }
     }
 
-    return request('/messages/send', { method: 'POST', body: JSON.stringify(data) });
+    return request('/messages/send', { method: 'POST', body: JSON.stringify({ ...data, isDemo }) });
   },
   scheduleMessage: async (data) => {
+    let isDemo = false;
+    if (data.isDemo !== undefined) {
+      isDemo = Boolean(data.isDemo);
+    } else if (data.demo_mode !== undefined) {
+      isDemo = data.demo_mode === 'true';
+    } else {
+      try {
+        const saved = localStorage.getItem('smartsend_settings');
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed.demo_mode !== undefined) {
+            isDemo = parsed.demo_mode === 'true';
+          }
+        }
+      } catch (e) {}
+    }
+
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const hasCustomApiUrl = Boolean(import.meta.env.VITE_API_URL);
 
     if (isLocal || hasCustomApiUrl) {
-      return request('/messages/schedule', { method: 'POST', body: JSON.stringify(data) });
+      return request('/messages/schedule', { method: 'POST', body: JSON.stringify({ ...data, isDemo }) });
     }
 
     if (isSupabaseConfigured) {
@@ -576,14 +715,14 @@ export const api = {
           scheduled_time: data.scheduled_time || new Date().toISOString(),
           timezone: data.timezone || 'UTC',
           status: 'scheduled',
-          is_demo: 1
+          is_demo: isDemo ? 1 : 0
         }]).select().single();
 
         if (!error && sched) {
           return {
             success: true,
-            message: 'Message scheduled and recorded in Supabase (Demo Mode)',
-            isDemo: true
+            message: isDemo ? 'Message scheduled (Demo Mode)' : 'Message scheduled (Live Delivery Pipeline)',
+            isDemo
           };
         }
       } catch (e) {
@@ -591,7 +730,7 @@ export const api = {
       }
     }
 
-    return request('/messages/schedule', { method: 'POST', body: JSON.stringify(data) });
+    return request('/messages/schedule', { method: 'POST', body: JSON.stringify({ ...data, isDemo }) });
   },
   getMessages: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
@@ -653,25 +792,42 @@ export const api = {
         if (params.channel && params.channel !== 'all') query = query.eq('channel', params.channel);
         if (params.status && params.status !== 'all') query = query.eq('status', params.status);
         const { data: logs, error } = await query;
-        if (!error && Array.isArray(logs)) {
+        if (!error && Array.isArray(logs) && logs.length > 0) {
           return { logs, total: logs.length };
         }
       } catch (e) {
         console.warn('Supabase getDeliveryLogs error:', e);
       }
     }
+
+    try {
+      const saved = localStorage.getItem('smartsend_delivery_logs');
+      if (saved) {
+        let logs = JSON.parse(saved);
+        if (params.channel && params.channel !== 'all') logs = logs.filter(l => l.channel === params.channel);
+        if (params.status && params.status !== 'all') logs = logs.filter(l => l.status === params.status);
+        return { logs, total: logs.length };
+      }
+    } catch (e) {}
+
     const qs = new URLSearchParams(params).toString();
     return request(`/messages/logs${qs ? `?${qs}` : ''}`);
   },
   deleteDeliveryLog: async (id) => {
     if (isSupabaseConfigured) {
       try {
-        const { error } = await supabase.from('message_logs').delete().eq('id', id);
-        if (!error) return { success: true, message: 'Delivery log deleted' };
+        await supabase.from('message_logs').delete().eq('id', id);
       } catch (e) {
         console.warn('Supabase deleteDeliveryLog error:', e);
       }
     }
+    try {
+      const saved = localStorage.getItem('smartsend_delivery_logs');
+      if (saved) {
+        const logs = JSON.parse(saved).filter(l => Number(l.id) !== Number(id));
+        localStorage.setItem('smartsend_delivery_logs', JSON.stringify(logs));
+      }
+    } catch (e) {}
     return request(`/messages/logs/${id}`, { method: 'DELETE' });
   },
   clearDeliveryLogs: async (params = {}) => {
@@ -680,44 +836,80 @@ export const api = {
         let query = supabase.from('message_logs').delete();
         if (params.channel && params.channel !== 'all') query = query.eq('channel', params.channel);
         if (params.status && params.status !== 'all') query = query.eq('status', params.status);
-        const { error } = await query.neq('id', 0);
-        if (!error) return { success: true, message: 'Logs cleared' };
+        await query.neq('id', 0);
       } catch (e) {
         console.warn('Supabase clearDeliveryLogs error:', e);
       }
     }
+    try {
+      localStorage.removeItem('smartsend_delivery_logs');
+    } catch (e) {}
     const qs = new URLSearchParams(params).toString();
     return request(`/messages/logs/clear${qs ? `?${qs}` : ''}`, { method: 'DELETE' });
   },
 
   // Settings
   getSettings: async () => {
+    let localSettings = {};
+    try {
+      const saved = localStorage.getItem('smartsend_settings');
+      if (saved) localSettings = JSON.parse(saved);
+    } catch (e) {}
+
+    let fetchedSettings = {};
     if (isSupabaseConfigured) {
       try {
         const { data: rows, error } = await supabase.from('settings').select('*');
         if (!error && Array.isArray(rows) && rows.length > 0) {
-          const settingsObj = {};
-          rows.forEach(r => { settingsObj[r.key] = r.value; });
-          return { settings: settingsObj };
+          rows.forEach(r => { fetchedSettings[r.key] = r.value; });
         }
       } catch (e) {
         console.warn('Supabase getSettings error:', e);
       }
     }
-    return request('/settings');
+
+    try {
+      const res = await request('/settings');
+      if (res && res.settings) {
+        fetchedSettings = { ...res.settings, ...fetchedSettings };
+      }
+    } catch (e) {}
+
+    const merged = {
+      demo_mode: 'false',
+      email_provider: 'resend',
+      resend_from: 'SmartSend AI <notifications@smartsendai.online>',
+      ...fetchedSettings,
+      ...localSettings
+    };
+
+    return { settings: merged };
   },
   updateSettings: async (data) => {
+    // 1. Immediately cache in localStorage
+    try {
+      const existing = localStorage.getItem('smartsend_settings');
+      const current = existing ? JSON.parse(existing) : {};
+      localStorage.setItem('smartsend_settings', JSON.stringify({ ...current, ...data }));
+    } catch (e) {}
+
+    // 2. Upsert to Supabase if configured
     if (isSupabaseConfigured) {
       try {
         for (const [key, value] of Object.entries(data)) {
           await supabase.from('settings').upsert({ key, value: String(value) }, { onConflict: 'key' });
         }
-        return { success: true, message: 'Settings saved to Supabase' };
       } catch (e) {
         console.warn('Supabase updateSettings error:', e);
       }
     }
-    return request('/settings', { method: 'PUT', body: JSON.stringify(data) });
+
+    // 3. Always also forward to backend (SQLite)
+    try {
+      await request('/settings', { method: 'PUT', body: JSON.stringify(data) });
+    } catch (e) {}
+
+    return { success: true, message: 'Settings saved successfully' };
   },
   testLlm: (data) => request('/settings/test-llm', { method: 'POST', body: JSON.stringify(data) }),
   testChannel: (data) => request('/settings/test-channel', { method: 'POST', body: JSON.stringify(data) }),

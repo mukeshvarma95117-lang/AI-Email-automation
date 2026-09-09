@@ -80,9 +80,14 @@ export async function sendMessage(req, res) {
       return res.status(400).json({ error: 'No recipients selected. Please choose at least one contact or group.' });
     }
 
-    // Check Demo Mode setting
+    // Check Demo Mode setting (payload overrides database setting)
     const demoModeSetting = dbHelper.get("SELECT value FROM settings WHERE key = 'demo_mode'");
-    const isDemo = demoModeSetting?.value === 'true';
+    let isDemo = demoModeSetting?.value === 'true';
+    if (req.body.isDemo !== undefined) {
+      isDemo = Boolean(req.body.isDemo);
+    } else if (req.body.demo_mode !== undefined) {
+      isDemo = req.body.demo_mode === 'true';
+    }
 
     // Insert master message record
     const recipientTargets = targetContacts.map(c => channel === 'email' ? c.email : c.phone).filter(Boolean);
@@ -124,7 +129,7 @@ export async function sendMessage(req, res) {
         if (!target) {
           sendResult = { success: false, status: 'Failed', error: 'Missing email address' };
         } else {
-          sendResult = await sendEmail({ to: target, subject: renderedSubject, body: renderedBody, cta });
+          sendResult = await sendEmail({ to: target, subject: renderedSubject, body: renderedBody, cta, forceReal: !isDemo });
         }
       } else if (channel === 'whatsapp') {
         target = contact.phone;
@@ -235,7 +240,12 @@ export async function scheduleMessage(req, res) {
     }
 
     const demoModeSetting = dbHelper.get("SELECT value FROM settings WHERE key = 'demo_mode'");
-    const isDemo = demoModeSetting?.value === 'true' ? 1 : 0;
+    let isDemo = demoModeSetting?.value === 'true' ? 1 : 0;
+    if (req.body.isDemo !== undefined) {
+      isDemo = req.body.isDemo ? 1 : 0;
+    } else if (req.body.demo_mode !== undefined) {
+      isDemo = req.body.demo_mode === 'true' ? 1 : 0;
+    }
 
     // Create message entry
     const msg = dbHelper.run(
