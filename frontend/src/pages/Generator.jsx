@@ -81,6 +81,7 @@ export default function Generator() {
   const [selectedGroupId, setSelectedGroupId] = useState('');
   const [selectedContactIds, setSelectedContactIds] = useState([]);
   const [recipientMode, setRecipientMode] = useState('group'); // 'group', 'individual', or 'custom'
+  const [contactSearch, setContactSearch] = useState('');
   const [customRecipients, setCustomRecipients] = useState([]);
   const [customEmailInput, setCustomEmailInput] = useState('');
   const [customNameInput, setCustomNameInput] = useState('');
@@ -343,6 +344,13 @@ export default function Generator() {
   // Live variable substituted preview text
   const renderedSubject = substituteVariables(subject, currentPreviewContact);
   const renderedBody = substituteVariables(body, currentPreviewContact);
+
+  // Filter contacts by search query
+  const filteredContacts = contacts.filter(c => {
+    if (!contactSearch.trim()) return true;
+    const q = contactSearch.toLowerCase();
+    return (c.name || '').toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q);
+  });
 
   // Compute recipient list
   const currentRecipients = recipientMode === 'group'
@@ -854,34 +862,82 @@ export default function Generator() {
 
             {/* Recipient Mode 2: Individual Contacts */}
             {recipientMode === 'individual' && (
-              <div className="space-y-2 text-xs max-h-48 overflow-y-auto border border-slate-100 dark:border-slate-800 rounded-xl p-2">
-                {contacts.map(c => {
-                  const isChecked = selectedContactIds.includes(c.id);
-                  return (
-                    <label key={c.id} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={e => {
-                          if (e.target.checked) setSelectedContactIds(prev => [...prev, c.id]);
-                          else setSelectedContactIds(prev => prev.filter(id => id !== c.id));
-                        }}
-                        className="rounded text-indigo-600 focus:ring-indigo-500"
-                      />
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">{c.name}</span>
-                      <span className="text-slate-400 truncate">({c.email || c.phone})</span>
-                    </label>
-                  );
-                })}
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    {selectedContactIds.length} of {contacts.length} Selected
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedContactIds(contacts.map(c => c.id))}
+                      className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
+                    >
+                      Select All ({contacts.length})
+                    </button>
+                    <span>|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedContactIds([])}
+                      className="text-slate-500 hover:underline cursor-pointer"
+                    >
+                      Deselect All
+                    </button>
+                  </div>
+                </div>
+
+                <input
+                  type="text"
+                  placeholder="Search contacts to pick..."
+                  value={contactSearch}
+                  onChange={e => setContactSearch(e.target.value)}
+                  className="w-full px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+                />
+
+                <div className="space-y-1.5 text-xs max-h-48 overflow-y-auto border border-slate-100 dark:border-slate-800 rounded-xl p-2">
+                  {filteredContacts.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 text-center py-3">No contacts match filter.</p>
+                  ) : (
+                    filteredContacts.map(c => {
+                      const isChecked = selectedContactIds.includes(c.id);
+                      return (
+                        <label key={c.id} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={e => {
+                              if (e.target.checked) setSelectedContactIds(prev => [...prev, c.id]);
+                              else setSelectedContactIds(prev => prev.filter(id => id !== c.id));
+                            }}
+                            className="rounded text-indigo-600 focus:ring-indigo-500"
+                          />
+                          <span className="font-semibold text-slate-800 dark:text-slate-200">{c.name}</span>
+                          <span className="text-slate-400 truncate">({c.email || c.phone})</span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
               </div>
             )}
 
             {/* Recipient Mode 3: Custom / Direct Email Addresses */}
             {recipientMode === 'custom' && (
               <div className="space-y-3 text-xs">
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  Type any real email address (e.g. your colleague or client) to dispatch directly without needing prior database contacts.
-                </p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Paste multiple email addresses (comma, semicolon, or line-separated) to dispatch to multiple persons at once.
+                  </p>
+                  {customRecipients.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomRecipients([])}
+                      className="text-[11px] text-rose-600 hover:underline font-semibold cursor-pointer shrink-0 ml-2"
+                    >
+                      Clear All ({customRecipients.length})
+                    </button>
+                  )}
+                </div>
 
                 <form onSubmit={handleAddCustomRecipient} className="space-y-2">
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
