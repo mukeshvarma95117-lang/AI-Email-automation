@@ -45,11 +45,17 @@ export function AuthProvider({ children }) {
         try {
           const { data: { session }, error } = await supabase.auth.getSession();
           if (session?.user && session?.access_token && mounted) {
+            const meta = session.user.user_metadata || {};
             const adminUser = {
               id: session.user.id,
-              name: session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+              name: meta.name || meta.full_name || session.user.email?.split('@')[0],
               email: session.user.email,
-              role: 'admin'
+              role: 'admin',
+              title: meta.title || 'Lead Administrator',
+              phone: meta.phone || '',
+              company: meta.company || 'SmartSend AI',
+              bio: meta.bio || '',
+              avatar_url: meta.avatar_url || ''
             };
             setToken(session.access_token);
             setUser(adminUser);
@@ -97,11 +103,17 @@ export function AuthProvider({ children }) {
       const { data } = supabase.auth.onAuthStateChange((event, session) => {
         if (!mounted) return;
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user && session?.access_token) {
+          const meta = session.user.user_metadata || {};
           const adminUser = {
             id: session.user.id,
-            name: session.user.user_metadata?.name || session.user.user_metadata?.full_name || session.user.email?.split('@')[0],
+            name: meta.name || meta.full_name || session.user.email?.split('@')[0],
             email: session.user.email,
-            role: 'admin'
+            role: 'admin',
+            title: meta.title || 'Lead Administrator',
+            phone: meta.phone || '',
+            company: meta.company || 'SmartSend AI',
+            bio: meta.bio || '',
+            avatar_url: meta.avatar_url || ''
           };
           setToken(session.access_token);
           setUser(adminUser);
@@ -134,6 +146,21 @@ export function AuthProvider({ children }) {
     return res;
   };
 
+  const updateProfile = async (profileData) => {
+    const res = await api.updateProfile(profileData);
+    if (res?.user) {
+      setUser(res.user);
+      localStorage.setItem('smartsend_user', JSON.stringify(res.user));
+    } else {
+      setUser(prev => {
+        const next = { ...prev, ...profileData };
+        localStorage.setItem('smartsend_user', JSON.stringify(next));
+        return next;
+      });
+    }
+    return res;
+  };
+
   const register = async () => {
     throw new Error('Public registration is disabled. Only authorized administrators can access this workspace.');
   };
@@ -153,7 +180,7 @@ export function AuthProvider({ children }) {
   const isAuthenticated = Boolean(token && !token.startsWith('demo-') && !token.startsWith('mock-'));
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, isAuthenticated }}>
+    <AuthContext.Provider value={{ user, token, loading, login, register, logout, updateProfile, isAuthenticated }}>
       {children}
     </AuthContext.Provider>
   );

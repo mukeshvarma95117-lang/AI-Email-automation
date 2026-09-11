@@ -13,6 +13,7 @@ import Contacts from './pages/Contacts';
 import Scheduled from './pages/Scheduled';
 import History from './pages/History';
 import Settings from './pages/Settings';
+import Profile from './pages/Profile';
 
 function ProtectedLayout() {
   const { isAuthenticated, loading } = useAuth();
@@ -85,6 +86,7 @@ export default function App() {
                 <Route path="/scheduled" element={<Scheduled />} />
                 <Route path="/history" element={<History />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/profile" element={<Profile />} />
                 <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>

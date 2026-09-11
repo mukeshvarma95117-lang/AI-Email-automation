@@ -37,11 +37,26 @@ function handleMockFallback(endpoint, options = {}) {
 
   if (endpoint.startsWith('/auth/me')) {
     const saved = localStorage.getItem('smartsend_user');
-    let user = { id: 1, name: 'Admin User', email: 'admin@smartsend.ai', role: 'admin' };
+    let user = { id: 1, name: 'Admin User', email: 'admin@smartsendai.online', role: 'admin' };
     try {
       if (saved) user = JSON.parse(saved);
     } catch (e) {}
     return { user };
+  }
+
+  if (endpoint.startsWith('/auth/profile') && method === 'PUT') {
+    let body = {};
+    try { body = JSON.parse(options.body || '{}'); } catch (e) {}
+    const saved = localStorage.getItem('smartsend_user');
+    let currentUser = { id: 1, name: 'SmartSend Administrator', email: 'admin@smartsendai.online', role: 'admin' };
+    try { if (saved) currentUser = JSON.parse(saved); } catch (e) {}
+    const updatedUser = { ...currentUser, ...body };
+    localStorage.setItem('smartsend_user', JSON.stringify(updatedUser));
+    return { success: true, message: 'Profile updated successfully', user: updatedUser };
+  }
+
+  if (endpoint.startsWith('/auth/password') && method === 'PUT') {
+    return { success: true, message: 'Password updated successfully' };
   }
 
   if (endpoint.startsWith('/dashboard')) {
@@ -502,12 +517,18 @@ export const api = {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (user) {
+          const meta = user.user_metadata || {};
           return {
             user: {
               id: user.id,
-              name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
+              name: meta.name || meta.full_name || user.email?.split('@')[0],
               email: user.email,
-              role: 'admin'
+              role: 'admin',
+              title: meta.title || 'Lead Administrator',
+              phone: meta.phone || '',
+              company: meta.company || 'SmartSend AI',
+              bio: meta.bio || '',
+              avatar_url: meta.avatar_url || ''
             }
           };
         }
@@ -516,6 +537,63 @@ export const api = {
       }
     }
     return request('/auth/me');
+  },
+  updateProfile: async (profileData) => {
+    // 1. If Supabase configured, update user metadata
+    if (isSupabaseConfigured) {
+      try {
+        await supabase.auth.updateUser({
+          data: {
+            name: profileData.name,
+            full_name: profileData.name,
+            title: profileData.title,
+            phone: profileData.phone,
+            company: profileData.company,
+            bio: profileData.bio,
+            avatar_url: profileData.avatar_url
+          }
+        });
+      } catch (err) {
+        console.warn('Supabase updateUser metadata error:', err);
+      }
+    }
+
+    // 2. Persist to backend if running
+    let res = null;
+    try {
+      res = await request('/auth/profile', {
+        method: 'PUT',
+        body: JSON.stringify(profileData)
+      });
+    } catch (e) {
+      console.warn('Backend update profile error:', e);
+    }
+
+    // 3. Update local storage immediately for client reactivity
+    const currentStr = localStorage.getItem('smartsend_user');
+    let currentUser = {};
+    try { if (currentStr) currentUser = JSON.parse(currentStr); } catch (e) {}
+    const mergedUser = { ...currentUser, ...profileData, ...(res?.user || {}) };
+    localStorage.setItem('smartsend_user', JSON.stringify(mergedUser));
+
+    return res || { success: true, user: mergedUser, message: 'Profile updated successfully' };
+  },
+  changePassword: async ({ currentPassword, newPassword }) => {
+    // 1. Supabase auth update password if configured
+    if (isSupabaseConfigured) {
+      try {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) console.warn('Supabase change password error:', error);
+      } catch (err) {
+        console.warn('Supabase change password error:', err);
+      }
+    }
+
+    // 2. Backend update password
+    return request('/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify({ currentPassword, newPassword })
+    });
   },
 
   // AI

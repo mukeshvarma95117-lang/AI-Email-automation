@@ -107,6 +107,22 @@ db.exec(`
   );
 `);
 
+// Safe column migrations for user profile fields
+const userColumnsToAdd = [
+  "ALTER TABLE users ADD COLUMN title TEXT DEFAULT 'Lead Administrator';",
+  "ALTER TABLE users ADD COLUMN phone TEXT DEFAULT '';",
+  "ALTER TABLE users ADD COLUMN company TEXT DEFAULT 'SmartSend AI';",
+  "ALTER TABLE users ADD COLUMN bio TEXT DEFAULT '';",
+  "ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT '';"
+];
+for (const colSql of userColumnsToAdd) {
+  try {
+    db.exec(colSql);
+  } catch (e) {
+    // Column already exists or table busy, safe to ignore
+  }
+}
+
 /**
  * Helper methods wrapping DatabaseSync for consistent syntax
  */

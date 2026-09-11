@@ -26,6 +26,7 @@ const NAV_ITEMS = [
   { path: '/contacts', label: 'Contacts & Groups', icon: Users },
   { path: '/scheduled', label: 'Scheduled Queue', icon: Clock },
   { path: '/history', label: 'Delivery History', icon: History },
+  { path: '/profile', label: 'Admin Profile', icon: User },
   { path: '/settings', label: 'Settings & APIs', icon: Settings },
 ];
 
@@ -130,9 +131,18 @@ export default function Navbar() {
               onClick={() => setMenuOpen(!menuOpen)}
               className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs shadow-xs">
-                {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
-              </div>
+              {user?.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user?.name || 'Admin'}
+                  className="w-7 h-7 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-slate-700 shadow-xs"
+                  onError={(e) => { e.target.style.display = 'none'; }}
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs shadow-xs">
+                  {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                </div>
+              )}
               <span className="hidden md:block text-xs font-medium text-slate-700 dark:text-slate-200">
                 {user?.name || 'Admin'}
               </span>
@@ -145,26 +155,35 @@ export default function Navbar() {
               >
                 <div
                   onClick={e => e.stopPropagation()}
-                  className="absolute right-4 top-14 w-56 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-2 z-50 text-xs"
+                  className="absolute right-4 top-14 w-60 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-2 z-50 text-xs"
                 >
                   <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-                    <p className="font-semibold text-slate-800 dark:text-slate-100">{user?.name || 'Admin User'}</p>
-                    <p className="text-slate-400 truncate">{user?.email || 'admin@smartsend.ai'}</p>
+                    <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{user?.name || 'Admin User'}</p>
+                    <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">{user?.title || 'Workspace Administrator'}</p>
+                    <p className="text-slate-400 truncate text-[10px] mt-0.5">{user?.email || 'admin@smartsendai.online'}</p>
                   </div>
+                  <Link
+                    to="/profile"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors mt-1 font-medium"
+                  >
+                    <User className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                    <span>My Profile</span>
+                  </Link>
                   <Link
                     to="/settings"
                     onClick={() => setMenuOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors mt-1"
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                   >
-                    <User className="w-4 h-4" />
-                    Settings & API Keys
+                    <Settings className="w-4 h-4 text-slate-500" />
+                    <span>Settings & API Keys</span>
                   </Link>
                   <button
                     onClick={handleLogout}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors mt-1 cursor-pointer"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors mt-1 cursor-pointer border-t border-slate-100 dark:border-slate-800/80 pt-2"
                   >
                     <LogOut className="w-4 h-4" />
-                    Sign Out
+                    <span>Sign Out</span>
                   </button>
                 </div>
               </div>
