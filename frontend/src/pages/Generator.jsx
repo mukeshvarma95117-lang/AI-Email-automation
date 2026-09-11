@@ -419,7 +419,7 @@ export default function Generator() {
   };
 
   // Schedule for later
-  const handleScheduleConfirm = async ({ scheduledDateTime, timezone }) => {
+  const handleScheduleConfirm = async ({ scheduledDateTime, utcScheduledTime, timezone }) => {
     setIsSending(true);
     try {
       const isAllGroup = recipientMode === 'group' && (!selectedGroupId || selectedGroupId === 'all');
@@ -436,7 +436,8 @@ export default function Generator() {
         groupId: recipientMode === 'group' ? (selectedGroupId && selectedGroupId !== 'all' ? Number(selectedGroupId) : 'all') : null,
         recipientIds: recipientMode === 'individual' ? selectedContactIds : currentRecipients.map(c => c.id),
         sendToAll: isAllGroup,
-        scheduled_time: scheduledDateTime,
+        scheduled_time: utcScheduledTime || scheduledDateTime,
+        raw_scheduled_time: scheduledDateTime,
         timezone
       };
 

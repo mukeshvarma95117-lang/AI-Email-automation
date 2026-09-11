@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { parseToUtc } from '../utils/dateUtils';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const BASE_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
@@ -864,11 +865,27 @@ export const api = {
       } catch (e) {}
     }
 
+    // Accurately convert local time and timezone to UTC ISO string
+    const targetTz = data.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const utcScheduledTime = parseToUtc(data.scheduled_time, targetTz);
+
+    const payload = {
+      ...data,
+      scheduled_time: utcScheduledTime,
+      timezone: targetTz,
+      isDemo
+    };
+
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const hasCustomApiUrl = Boolean(import.meta.env.VITE_API_URL);
 
     if (isLocal || hasCustomApiUrl) {
-      return request('/messages/schedule', { method: 'POST', body: JSON.stringify({ ...data, isDemo }) });
+      try {
+        const res = await request('/messages/schedule', { method: 'POST', body: JSON.stringify(payload) });
+        if (res && res.success) return res;
+      } catch (e) {
+        console.warn('Backend schedule error, falling back to Supabase:', e);
+      }
     }
 
     if (isSupabaseConfigured) {
@@ -877,9 +894,9 @@ export const api = {
           channel: data.channel || 'email',
           subject: data.subject || '',
           body: data.body || '',
-          recipients_json: JSON.stringify(data.recipientIds || []),
-          scheduled_time: data.scheduled_time || new Date().toISOString(),
-          timezone: data.timezone || 'UTC',
+          recipients_json: JSON.stringify(data.recipientIds || data.recipients || []),
+          scheduled_time: utcScheduledTime,
+          timezone: targetTz,
           status: 'scheduled',
           is_demo: isDemo ? 1 : 0
         }]).select().single();
@@ -888,7 +905,8 @@ export const api = {
           return {
             success: true,
             message: isDemo ? 'Message scheduled (Demo Mode)' : 'Message scheduled (Live Delivery Pipeline)',
-            isDemo
+            isDemo,
+            scheduled: sched
           };
         }
       } catch (e) {
@@ -896,7 +914,7 @@ export const api = {
       }
     }
 
-    return request('/messages/schedule', { method: 'POST', body: JSON.stringify({ ...data, isDemo }) });
+    return request('/messages/schedule', { method: 'POST', body: JSON.stringify(payload) });
   },
   getMessages: (params = {}) => {
     const qs = new URLSearchParams(params).toString();
@@ -904,6 +922,22 @@ export const api = {
   },
   getMessageById: (id) => request(`/messages/${id}`),
   getScheduledMessages: async () => {
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const hasCustomApiUrl = Boolean(import.meta.env.VITE_API_URL);
+
+    // 1. Try local backend first if running
+    if (isLocal || hasCustomApiUrl) {
+      try {
+        const res = await request('/messages/scheduled');
+        if (res && Array.isArray(res.scheduled) && res.scheduled.length > 0) {
+          return res;
+        }
+      } catch (e) {
+        console.warn('Backend getScheduledMessages error:', e);
+      }
+    }
+
+    // 2. Try Supabase
     if (isSupabaseConfigured) {
       try {
         const { data: scheduled, error } = await supabase.from('scheduled_messages').select('*').order('scheduled_time', { ascending: true });
@@ -927,8 +961,92 @@ export const api = {
     }
     return request(`/messages/scheduled/${id}/cancel`, { method: 'POST' });
   },
-  sendScheduledNow: (id) => request(`/messages/scheduled/${id}/send-now`, { method: 'POST' }),
-  processScheduledQueue: () => request('/messages/scheduled/process-queue', { method: 'POST' }),
+  sendScheduledNow: async (id) => {
+    if (isSupabaseConfigured) {
+      try {
+        const { data: job, error } = await supabase.from('scheduled_messages').select('*').eq('id', id).single();
+        if (!error && job) {
+          await supabase.from('scheduled_messages').update({ status: 'processing' }).eq('id', id);
+          let recipients = [];
+          try {
+            recipients = JSON.parse(job.recipients_json || '[]');
+          } catch (e) {}
+
+          const sendRes = await api.sendMessage({
+            channel: job.channel || 'email',
+            subject: job.subject,
+            body: job.body,
+            recipientIds: Array.isArray(recipients) ? recipients : [],
+            isDemo: Boolean(job.is_demo)
+          });
+
+          const finalStatus = sendRes?.success ? 'completed' : 'failed';
+          await supabase.from('scheduled_messages').update({ status: finalStatus }).eq('id', id);
+          return { success: Boolean(sendRes?.success), successCount: sendRes?.successCount || 1, message: 'Dispatched immediately' };
+        }
+      } catch (e) {
+        console.warn('Supabase sendScheduledNow error:', e);
+      }
+    }
+
+    return request(`/messages/scheduled/${id}/send-now`, { method: 'POST' });
+  },
+  processScheduledQueue: async () => {
+    let processed = 0;
+
+    // 1. Process due jobs in Supabase if configured
+    if (isSupabaseConfigured) {
+      try {
+        const { data: pending, error } = await supabase
+          .from('scheduled_messages')
+          .select('*')
+          .eq('status', 'scheduled');
+
+        if (!error && Array.isArray(pending) && pending.length > 0) {
+          const now = new Date();
+          for (const item of pending) {
+            const dueTime = new Date(item.scheduled_time);
+            if (dueTime <= now) {
+              await supabase.from('scheduled_messages').update({ status: 'processing' }).eq('id', item.id);
+              try {
+                let recipients = [];
+                try { recipients = JSON.parse(item.recipients_json || '[]'); } catch (e) {}
+
+                const sendRes = await api.sendMessage({
+                  channel: item.channel || 'email',
+                  subject: item.subject,
+                  body: item.body,
+                  recipientIds: Array.isArray(recipients) ? recipients : [],
+                  isDemo: Boolean(item.is_demo)
+                });
+
+                const finalStatus = sendRes?.success ? 'completed' : 'failed';
+                await supabase.from('scheduled_messages').update({ status: finalStatus }).eq('id', item.id);
+                processed++;
+              } catch (dispatchErr) {
+                console.error('Failed to dispatch scheduled message:', dispatchErr);
+                await supabase.from('scheduled_messages').update({ status: 'failed' }).eq('id', item.id);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Supabase queue process error:', e);
+      }
+    }
+
+    // 2. Trigger backend queue processor if local/custom API
+    const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    const hasCustomApiUrl = Boolean(import.meta.env.VITE_API_URL);
+    if (isLocal || hasCustomApiUrl) {
+      try {
+        const bRes = await request('/messages/scheduled/process-queue', { method: 'POST' });
+        if (bRes && bRes.processed) processed += bRes.processed;
+      } catch (e) {}
+    }
+
+    return { success: true, processed, message: `Processed ${processed} due message(s)` };
+  },
   deleteScheduledMessage: async (id) => {
     if (isSupabaseConfigured) {
       try {

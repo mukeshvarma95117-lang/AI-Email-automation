@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
+import { formatScheduledDisplay } from '../utils/dateUtils';
 import { Clock, Ban, Calendar, Globe, Mail, MessageSquare, Smartphone, CheckCircle, AlertCircle, RefreshCw, Trash2, Filter, Send, Play } from 'lucide-react';
 
 export default function Scheduled() {
@@ -11,21 +12,26 @@ export default function Scheduled() {
   const [processingQueue, setProcessingQueue] = useState(false);
   const { success, error, info } = useToast();
 
-  const loadScheduled = async () => {
-    setLoading(true);
+  const loadScheduled = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
+      // Auto-process any due messages in queue
+      try {
+        await api.processScheduledQueue();
+      } catch (e) {}
+
       const res = await api.getScheduledMessages();
       setScheduledList(res.scheduled || []);
     } catch (err) {
-      error(err.message || 'Failed to load scheduled messages.');
+      if (!silent) error(err.message || 'Failed to load scheduled messages.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     loadScheduled();
-    const interval = setInterval(loadScheduled, 15000); // 15s auto-refresh
+    const interval = setInterval(() => loadScheduled(true), 15000); // 15s auto-refresh & check
     return () => clearInterval(interval);
   }, []);
 
@@ -258,7 +264,7 @@ export default function Scheduled() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5 text-slate-800 dark:text-slate-200 font-medium">
                         <Calendar className="w-3.5 h-3.5 text-amber-500" />
-                        <span>{new Date(item.scheduled_time).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                        <span>{formatScheduledDisplay(item.scheduled_time, item.timezone)}</span>
                       </div>
                       <div className="flex items-center gap-1 text-[10px] text-slate-400 mt-0.5">
                         <Globe className="w-3 h-3" />

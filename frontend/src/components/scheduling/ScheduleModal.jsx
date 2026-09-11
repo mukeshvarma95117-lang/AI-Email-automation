@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Clock, Calendar, Globe, X, Check } from 'lucide-react';
+import { parseToUtc } from '../../utils/dateUtils';
 
 export default function ScheduleModal({
   isOpen,
@@ -23,7 +24,8 @@ export default function ScheduleModal({
   const handleSubmit = (e) => {
     e.preventDefault();
     const scheduledDateTime = `${date}T${time}:00`;
-    onSchedule({ scheduledDateTime, timezone });
+    const utcScheduledTime = parseToUtc(scheduledDateTime, timezone);
+    onSchedule({ scheduledDateTime, utcScheduledTime, timezone });
   };
 
   return (
