@@ -21,12 +21,12 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS = [
+  { path: '/profile', label: 'Admin Profile', icon: User },
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/generator', label: 'AI Composer', icon: Wand2, highlight: true },
   { path: '/contacts', label: 'Contacts & Groups', icon: Users },
   { path: '/scheduled', label: 'Scheduled Queue', icon: Clock },
   { path: '/history', label: 'Delivery History', icon: History },
-  { path: '/profile', label: 'Admin Profile', icon: User },
   { path: '/settings', label: 'Settings & APIs', icon: Settings },
 ];
 

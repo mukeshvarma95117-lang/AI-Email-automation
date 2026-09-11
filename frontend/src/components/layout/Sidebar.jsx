@@ -8,6 +8,7 @@ import {
   Clock,
   History,
   Settings,
+  User,
   Mail,
   MessageSquare,
   Smartphone,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 
 const NAV_ITEMS = [
+  { path: '/profile', label: 'Admin Profile', icon: User },
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
   { path: '/generator', label: 'AI Composer', icon: Wand2, highlight: true },
   { path: '/contacts', label: 'Contacts & Groups', icon: Users },
