@@ -55,8 +55,8 @@ export default function Dashboard() {
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-indigo-900 via-indigo-800 to-purple-900 p-6 sm:p-8 text-white shadow-xl shadow-indigo-950/20 border border-indigo-700/50">
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-2 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-indigo-200 backdrop-blur-md border border-white/10">
-              <Sparkles className="w-3.5 h-3.5 text-cyan-300" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-semibold bg-white/10 text-indigo-200 backdrop-blur-md border border-white/10">
+              <img src="/logo-icon.png" alt="SmartSend AI Logo" className="w-4 h-4 object-contain filter drop-shadow-[0_1px_4px_rgba(14,165,233,0.5)]" />
               <span>SmartSend Multi-Channel Platform</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">

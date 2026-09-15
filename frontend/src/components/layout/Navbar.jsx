@@ -27,6 +27,7 @@ const NAV_ITEMS = [
   { path: '/contacts', label: 'Contacts & Groups', icon: Users },
   { path: '/scheduled', label: 'Scheduled Queue', icon: Clock },
   { path: '/history', label: 'Delivery History', icon: History },
+  { path: '/profile', label: 'Admin Profile', icon: User },
   { path: '/settings', label: 'Settings & APIs', icon: Settings },
 ];
 
@@ -57,8 +58,12 @@ export default function Navbar() {
         {/* Left: Brand Logo & Title */}
         <div className="flex items-center gap-3">
           <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center text-white shadow-md shadow-indigo-500/25 group-hover:scale-105 transition-transform">
-              <Sparkles className="w-4 h-4" />
+            <div className="relative w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 p-1 flex items-center justify-center border border-indigo-500/30 shadow-md shadow-indigo-500/20 group-hover:scale-105 group-hover:border-indigo-400/50 transition-all">
+              <img
+                src="/logo-icon.png"
+                alt="SmartSend AI Logo"
+                className="w-full h-full object-contain filter drop-shadow-[0_2px_6px_rgba(14,165,233,0.35)]"
+              />
             </div>
             <div>
               <div className="flex items-center gap-2">

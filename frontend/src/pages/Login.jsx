@@ -82,9 +82,13 @@ export default function Login() {
         <div className="w-full md:w-1/2 p-8 sm:p-12 flex flex-col justify-between">
           <div>
             {/* Brand Logo & Title */}
-            <div className="flex items-center gap-2.5 mb-6">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 flex items-center justify-center text-white shadow-md shadow-indigo-500/20">
-                <Sparkles className="w-5 h-5" />
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-slate-900 via-slate-950 to-indigo-950 p-1 flex items-center justify-center border border-indigo-500/30 shadow-md shadow-indigo-500/20">
+                <img
+                  src="/logo-icon.png"
+                  alt="SmartSend AI Logo"
+                  className="w-full h-full object-contain filter drop-shadow-[0_2px_6px_rgba(14,165,233,0.35)]"
+                />
               </div>
               <div>
                 <span className="text-base font-bold tracking-tight text-slate-900 dark:text-white block">
@@ -227,7 +231,7 @@ export default function Login() {
 
             {/* Brand Pill */}
             <div className="relative z-10 flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 text-xs font-semibold text-white shadow-lg w-fit">
-              <Sparkles className="w-3.5 h-3.5 text-amber-300 animate-pulse" />
+              <img src="/logo-icon.png" alt="SmartSend AI Logo" className="w-4 h-4 object-contain filter drop-shadow-[0_1px_4px_rgba(14,165,233,0.5)]" />
               <span className="tracking-wide">SmartSend AI Suite</span>
             </div>
 
