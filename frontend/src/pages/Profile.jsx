@@ -69,7 +69,7 @@ export default function Profile() {
     company: user?.company || 'SmartSend AI Inc.',
     timezone: user?.timezone || 'Asia/Kolkata',
     bio: user?.bio || 'Head Administrator managing automated multi-channel messaging and AI email workflows.',
-    avatar_url: user?.avatar_url || '',
+    avatar_url: user?.avatar_url || '/admin-profile-logo.png',
     avatar_theme: user?.avatar_theme || 'indigo'
   });
 
@@ -103,7 +103,7 @@ export default function Profile() {
         company: user.company || prev.company,
         timezone: user.timezone || prev.timezone,
         bio: user.bio || prev.bio,
-        avatar_url: user.avatar_url || prev.avatar_url,
+        avatar_url: user.avatar_url || prev.avatar_url || '/admin-profile-logo.png',
         avatar_theme: user.avatar_theme || prev.avatar_theme
       }));
     }
@@ -220,24 +220,20 @@ export default function Profile() {
         <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/5 dark:bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
         <div className="flex flex-col md:flex-row items-center sm:items-start gap-6 relative z-10">
-          {/* Large Avatar with Gradient or Custom Image */}
+          {/* Large Avatar with Official Brand Logo or Custom Image */}
           <div className="relative group">
-            {formData.avatar_url ? (
+            <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl overflow-hidden bg-slate-950 p-2 flex items-center justify-center ring-4 ring-white dark:ring-slate-800 shadow-xl border border-indigo-500/30">
               <img
-                src={formData.avatar_url}
+                src={formData.avatar_url || "/admin-profile-logo.png"}
                 alt={formData.name}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover ring-4 ring-white dark:ring-slate-800 shadow-lg"
+                className="w-full h-full object-contain filter drop-shadow-[0_4px_12px_rgba(14,165,233,0.4)] transition-transform duration-300 group-hover:scale-105"
                 onError={(e) => {
-                  e.target.style.display = 'none';
+                  e.target.src = "/logo-icon.png";
                 }}
               />
-            ) : (
-              <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-2xl bg-gradient-to-tr ${activeGradient} flex items-center justify-center text-white font-extrabold text-3xl sm:text-4xl shadow-lg ring-4 ring-white dark:ring-slate-800 transition-all`}>
-                {formData.name ? formData.name.charAt(0).toUpperCase() : 'A'}
-              </div>
-            )}
+            </div>
 
-            <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 flex items-center justify-center text-white" title="Active Admin Session">
+            <span className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-500 ring-2 ring-white dark:ring-slate-900 flex items-center justify-center text-white shadow-md" title="Active Admin Session">
               <Check className="w-3.5 h-3.5 stroke-[3]" />
             </span>
           </div>
@@ -483,10 +479,48 @@ export default function Profile() {
                   <span>Avatar Customization</span>
                 </h3>
 
+                {/* Logo Preset Selectors */}
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Official Brand Insignia
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('avatar_url', '/admin-profile-logo.png')}
+                      className={`flex items-center gap-2 p-2 rounded-xl border text-left text-xs font-medium transition-all cursor-pointer ${
+                        formData.avatar_url === '/admin-profile-logo.png' || !formData.avatar_url
+                          ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-900 dark:text-indigo-200'
+                          : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <div className="w-5 h-5 rounded-md bg-slate-950 p-0.5 flex items-center justify-center shrink-0">
+                        <img src="/admin-profile-logo.png" alt="Insignia" className="w-full h-full object-contain" />
+                      </div>
+                      <span className="truncate">3D Insignia</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleInputChange('avatar_url', '/admin-profile-logo.jpg')}
+                      className={`flex items-center gap-2 p-2 rounded-xl border text-left text-xs font-medium transition-all cursor-pointer ${
+                        formData.avatar_url === '/admin-profile-logo.jpg'
+                          ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/30 text-indigo-900 dark:text-indigo-200'
+                          : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60'
+                      }`}
+                    >
+                      <div className="w-5 h-5 rounded-md bg-slate-950 overflow-hidden flex items-center justify-center shrink-0">
+                        <img src="/admin-profile-logo.jpg" alt="Dark Card" className="w-full h-full object-cover" />
+                      </div>
+                      <span className="truncate">Dark Card</span>
+                    </button>
+                  </div>
+                </div>
+
                 {/* Custom Avatar Image URL */}
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    Profile Image URL (Optional)
+                    Custom Profile Image URL (Optional)
                   </label>
                   <input
                     type="url"
@@ -495,7 +529,7 @@ export default function Profile() {
                     placeholder="https://example.com/avatar.jpg"
                     className="w-full px-3 py-2 rounded-xl text-xs bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white"
                   />
-                  <p className="text-[10px] text-slate-400">Leave blank to use the color gradient avatar above.</p>
+                  <p className="text-[10px] text-slate-400">Select an official insignia above or enter a custom photo link.</p>
                 </div>
 
                 {/* Gradient Preset Selector */}

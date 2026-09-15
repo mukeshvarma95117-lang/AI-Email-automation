@@ -135,16 +135,20 @@ export default function Navbar() {
               onClick={() => setMenuOpen(!menuOpen)}
               className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              {user?.avatar_url ? (
+              {user?.avatar_url && user.avatar_url !== '/admin-profile-logo.png' ? (
                 <img
                   src={user.avatar_url}
                   alt={user?.name || 'Admin'}
                   className="w-7 h-7 rounded-lg object-cover ring-1 ring-slate-200 dark:ring-slate-700 shadow-xs"
-                  onError={(e) => { e.target.style.display = 'none'; }}
+                  onError={(e) => { e.target.src = "/admin-profile-logo.png"; }}
                 />
               ) : (
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-xs shadow-xs">
-                  {user?.name ? user.name.charAt(0).toUpperCase() : 'A'}
+                <div className="w-7 h-7 rounded-lg bg-slate-950 p-0.5 flex items-center justify-center border border-indigo-500/30 shadow-xs">
+                  <img
+                    src="/admin-profile-logo.png"
+                    alt="Admin"
+                    className="w-full h-full object-contain"
+                  />
                 </div>
               )}
               <span className="hidden md:block text-xs font-medium text-slate-700 dark:text-slate-200">
@@ -161,10 +165,18 @@ export default function Navbar() {
                   onClick={e => e.stopPropagation()}
                   className="absolute right-4 top-14 w-60 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-xl p-2 z-50 text-xs"
                 >
-                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800">
-                    <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{user?.name || 'Admin User'}</p>
-                    <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium">{user?.title || 'Workspace Administrator'}</p>
-                    <p className="text-slate-400 truncate text-[10px] mt-0.5">{user?.email || 'admin@smartsendai.online'}</p>
+                  <div className="px-3 py-2 border-b border-slate-100 dark:border-slate-800 flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-slate-950 p-0.5 shrink-0 border border-indigo-500/30 flex items-center justify-center">
+                      <img
+                        src={user?.avatar_url || "/admin-profile-logo.png"}
+                        alt="Avatar"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="font-semibold text-slate-800 dark:text-slate-100 truncate">{user?.name || 'Admin User'}</p>
+                      <p className="text-[11px] text-indigo-600 dark:text-indigo-400 font-medium truncate">{user?.title || 'Workspace Administrator'}</p>
+                    </div>
                   </div>
                   <Link
                     to="/profile"
