@@ -20,29 +20,46 @@ function mockGenerate({ prompt, tone = 'Professional', language = 'English', cha
   const lowerPrompt = (prompt || '').toLowerCase();
 
   // Extract entities from prompt
-  let eventName = 'AI Workshop';
+  let eventName = 'Hands-On AI Workshop';
   let eventDate = 'tomorrow';
   let eventTime = '10:00 AM';
   let eventLocation = 'Lab 3B / Virtual Room';
 
-  if (lowerPrompt.includes('workshop')) eventName = 'Hands-On AI Workshop';
+  // Smart prompt topic / event extraction
+  const aboutMatch = prompt.match(/\babout\s+(?:tomorrow['’]s\s+|today['’]s\s+)?([^.!?\n]+?)(?:\s+at\s+\d|\s+on\s+|\s+in\s+|\.|\?|!|$)/i);
+  if (aboutMatch && aboutMatch[1].trim().length > 2 && aboutMatch[1].trim().length < 50) {
+    eventName = aboutMatch[1].trim().replace(/\b\w/g, c => c.toUpperCase());
+  } else if (lowerPrompt.includes('workshop')) eventName = 'Hands-On AI Workshop';
   else if (lowerPrompt.includes('hackathon')) eventName = 'Inter-College Hackathon';
   else if (lowerPrompt.includes('interview')) eventName = 'Technical Round Interview';
-  else if (lowerPrompt.includes('exam')) eventName = 'Mid-Term Examination';
+  else if (lowerPrompt.includes('exam') || lowerPrompt.includes('test')) eventName = 'Mid-Term Examination';
+  else if (lowerPrompt.includes('webinar')) eventName = 'Live Interactive Webinar';
   else if (lowerPrompt.includes('meeting') || lowerPrompt.includes('discussion')) eventName = 'Team Project Discussion';
   else if (lowerPrompt.includes('fee') || lowerPrompt.includes('payment')) eventName = 'Tuition Fee Due Date';
   else if (lowerPrompt.includes('review') || lowerPrompt.includes('capstone')) eventName = 'Capstone Project Review';
+  else if (lowerPrompt.includes('sale') || lowerPrompt.includes('discount')) eventName = 'Exclusive Seasonal Offer';
 
-  // Extract time
-  const timeMatch = prompt.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM))\b/);
-  if (timeMatch) eventTime = timeMatch[1];
+  // Extract time (e.g. 11 AM, 11:00 AM, 11am, 2:30 PM, 9 PM)
+  const timeMatch = prompt.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i);
+  if (timeMatch) {
+    eventTime = timeMatch[1].toUpperCase();
+  }
 
   // Extract date / day
-  if (lowerPrompt.includes('tomorrow')) eventDate = 'tomorrow';
-  else if (lowerPrompt.includes('today')) eventDate = 'today';
-  else if (lowerPrompt.includes('friday')) eventDate = 'this Friday';
-  else if (lowerPrompt.includes('monday')) eventDate = 'this Monday';
-  else if (lowerPrompt.includes('saturday')) eventDate = 'this Saturday';
+  const dateMatch = prompt.match(/\b(tomorrow|today|tonight|this\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|monday|tuesday|wednesday|thursday|friday|saturday|sunday|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\b/i);
+  if (dateMatch) {
+    eventDate = dateMatch[1];
+  } else if (lowerPrompt.includes('tomorrow')) {
+    eventDate = 'tomorrow';
+  } else if (lowerPrompt.includes('today')) {
+    eventDate = 'today';
+  }
+
+  // Extract location
+  const locMatch = prompt.match(/\b(?:in|at|via)\s+(Lab\s+[0-9A-Za-z]+|Room\s+[0-9A-Za-z]+|Zoom(?:\s+Room)?|Google Meet|Teams|Auditorium(?:\s+[0-9A-Za-z]+)?)\b/i);
+  if (locMatch) {
+    eventLocation = locMatch[1];
+  }
 
   // Tone variations
   const greetings = {
@@ -74,34 +91,34 @@ function mockGenerate({ prompt, tone = 'Professional', language = 'English', cha
   if (channel === 'whatsapp') {
     subject = `${tone === 'Urgent' ? '⚠️ ' : '📌 '}${eventName} Details`;
     if (tone === 'Urgent') {
-      body = `${greeting}\n\n*Action Required:* Your scheduled session for *{{event}}* is happening on *{{date}}* at *{{time}}* in *{{location}}*.\n\nPlease confirm your attendance and bring your laptop ready.\n\n${signoff}`;
-      shortVersion = `⚠️ *URGENT:* {{event}} on {{date}} at {{time}}. Reply YES to confirm.`;
+      body = `${greeting}\n\n*Action Required:* Your scheduled session for *${eventName}* is happening on *${eventDate}* at *${eventTime}* in *${eventLocation}*.\n\nPlease confirm your attendance and bring your laptop ready.\n\n${signoff}`;
+      shortVersion = `⚠️ *URGENT:* ${eventName} on ${eventDate} at ${eventTime}. Reply YES to confirm.`;
       cta = 'Reply YES to Confirm';
     } else if (tone === 'Friendly' || tone === 'Casual') {
-      body = `${greeting}\n\nJust a quick heads up! *{{event}}* is taking place on *{{date}}* at *{{time}}* in *{{location}}*.\n\nWe’ve got an exciting agenda lined up. Let us know if you need anything beforehand!\n\n${signoff}`;
-      shortVersion = `👋 Hey {{name}}, reminder for {{event}} on {{date}} at {{time}}. See you there!`;
+      body = `${greeting}\n\nJust a quick heads up! *${eventName}* is taking place on *${eventDate}* at *${eventTime}* in *${eventLocation}*.\n\nWe’ve got an exciting agenda lined up. Let us know if you need anything beforehand!\n\n${signoff}`;
+      shortVersion = `👋 Hey {{name}}, reminder for ${eventName} on ${eventDate} at ${eventTime}. See you there!`;
       cta = 'View Details';
     } else {
-      body = `${greeting}\n\nThis is a notification regarding *{{event}}* scheduled for *{{date}}* at *{{time}}*.\n\nVenue: *{{location}}*.\nPlease ensure timely arrival.\n\n${signoff}`;
-      shortVersion = `Notification: {{event}} on {{date}} at {{time}} in {{location}}.`;
+      body = `${greeting}\n\nThis is a notification regarding *${eventName}* scheduled for *${eventDate}* at *${eventTime}*.\n\nVenue: *${eventLocation}*.\nPlease ensure timely arrival.\n\n${signoff}`;
+      shortVersion = `Notification: ${eventName} on ${eventDate} at ${eventTime} in ${eventLocation}.`;
       cta = 'Access Portal';
     }
   } else if (channel === 'sms') {
     subject = '';
     if (tone === 'Urgent') {
-      body = `ALERT: Hi {{name}}, your {{event}} is on {{date}} at {{time}} ({{location}}). Please reply 1 to confirm your seat immediately.`;
-      shortVersion = `ALERT: {{event}} on {{date}} @ {{time}}. Reply 1 to confirm.`;
+      body = `ALERT: Hi {{name}}, your ${eventName} is on ${eventDate} at ${eventTime} (${eventLocation}). Please reply 1 to confirm your seat immediately.`;
+      shortVersion = `ALERT: ${eventName} on ${eventDate} @ ${eventTime}. Reply 1 to confirm.`;
       cta = 'Reply 1';
     } else {
-      body = `Hi {{name}}, reminder for {{event}} scheduled on {{date}} at {{time}} in {{location}}. Reply YES to confirm. - SmartSend`;
-      shortVersion = `Reminder: {{event}} on {{date}} @ {{time}}. Reply YES to confirm.`;
+      body = `Hi {{name}}, reminder for ${eventName} scheduled on ${eventDate} at ${eventTime} in ${eventLocation}. Reply YES to confirm. - SmartSend`;
+      shortVersion = `Reminder: ${eventName} on ${eventDate} @ ${eventTime}. Reply YES to confirm.`;
       cta = 'Reply YES';
     }
   } else {
     // Email
     subject = `${tone === 'Urgent' ? '[URGENT] ' : ''}Reminder: ${eventName} - ${eventDate.toUpperCase()} at ${eventTime}`;
-    body = `${greeting}\n\nThis is a reminder regarding your upcoming session for {{event}} scheduled for {{date}} at {{time}}.\n\nSession Details:\n• Event: {{event}}\n• Date & Time: {{date}} at {{time}}\n• Location: {{location}}\n\nPlease review your preparation checklist and ensure your development environment is ready.\n\nIf you have any questions or schedule conflicts, please notify the coordinator as soon as possible.\n\n${signoff}`;
-    shortVersion = `Reminder: {{event}} is scheduled for {{date}} at {{time}} in {{location}}. Please arrive prepared.`;
+    body = `${greeting}\n\nThis is a reminder regarding your upcoming session for ${eventName} scheduled for ${eventDate} at ${eventTime}.\n\nSession Details:\n• Event: ${eventName}\n• Date & Time: ${eventDate} at ${eventTime}\n• Location: ${eventLocation}\n\nPlease review your preparation checklist and ensure your development environment is ready.\n\nIf you have any questions or schedule conflicts, please notify the coordinator as soon as possible.\n\n${signoff}`;
+    shortVersion = `Reminder: ${eventName} is scheduled for ${eventDate} at ${eventTime} in ${eventLocation}. Please arrive prepared.`;
     cta = 'Join Session / View Schedule';
   }
 
@@ -141,12 +158,10 @@ export async function generateMessage(params) {
 Your task is to take a user's instruction and generate high-converting, personalized, and channel-appropriate message copy.
 
 Requirements:
-1. Always incorporate dynamic personalization placeholders when applicable:
-   - {{name}} for recipient's name
-   - {{event}} for the event or subject matter
-   - {{date}} for scheduled date or day
-   - {{time}} for scheduled time
-   - {{location}} for room, lab, or virtual link
+1. Dynamic Personalization:
+   - Always incorporate {{name}} for the recipient's personal name.
+   - For campaign specifics (such as event/topic, date, time, location, deadlines), if the user prompt provides them (e.g. 'tomorrow at 11 AM', 'AI workshop'), write those exact details DIRECTLY into the message copy so the output explicitly reflects the user's instructions.
+   - Do NOT output {{time}}, {{date}}, or {{event}} placeholders when the user has provided specific times, dates, or topics in the prompt.
 2. Respect the selected Tone: ${tone}.
 3. Generate content in language: ${language}.
 4. Optimize format for Channel: ${channel}

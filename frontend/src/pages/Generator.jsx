@@ -36,6 +36,8 @@ import {
   Trash2,
   AtSign,
   UserCheck,
+  RefreshCw,
+  Loader2,
   Settings as SettingsIcon
 } from 'lucide-react';
 
@@ -58,6 +60,9 @@ export default function Generator() {
 
   // Prompt configuration state
   const [prompt, setPrompt] = useState(
+    'Send a professional reminder to all students about tomorrow’s AI workshop at 10 AM.'
+  );
+  const [lastGeneratedPrompt, setLastGeneratedPrompt] = useState(
     'Send a professional reminder to all students about tomorrow’s AI workshop at 10 AM.'
   );
   const [tone, setTone] = useState('Professional');
@@ -289,6 +294,7 @@ export default function Generator() {
       setModelUsed(data.modelUsed || '');
       setIsMock(Boolean(data.isMock));
       setAiNotice(data.notice || '');
+      setLastGeneratedPrompt(prompt.trim());
 
       success('AI message generated successfully!', 'Generation Complete');
     } catch (err) {
@@ -385,6 +391,9 @@ export default function Generator() {
   // Live variable substituted preview text
   const renderedSubject = substituteVariables(subject, currentPreviewContact);
   const renderedBody = substituteVariables(body, currentPreviewContact);
+
+  // Check if description prompt has been modified since last generation
+  const isPromptModified = Boolean(body) && prompt.trim().length > 0 && prompt.trim() !== lastGeneratedPrompt.trim();
 
   // Safety checks
   const missingTargets = currentRecipients.filter(c => channel === 'email' ? !c.email : !c.phone).length;
@@ -651,8 +660,42 @@ export default function Generator() {
               placeholder="e.g. Send a friendly reminder to students about tomorrow’s AI workshop at 10 AM in Lab 3B..."
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
+              onKeyDown={e => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                  e.preventDefault();
+                  handleGenerate();
+                }
+              }}
               className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/60 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-colors"
             />
+
+            {/* Alert Banner when Description is modified */}
+            {isPromptModified && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-purple-500/10 border border-amber-300 dark:border-amber-700/60 text-slate-800 dark:text-slate-200 text-xs animate-in fade-in slide-in-from-top-1 duration-200 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
+                  <div>
+                    <span className="font-bold text-amber-900 dark:text-amber-300">Description updated:</span>
+                    <span className="ml-1 text-slate-700 dark:text-slate-300">
+                      New instructions detected. Click <strong>Update Email Now</strong> or press <kbd className="px-1.5 py-0.5 text-[10px] bg-white dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 font-mono shadow-xs">Ctrl+Enter</kbd> to refresh your email copy.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm transition-all cursor-pointer shrink-0 active:scale-95"
+                >
+                  {isGenerating ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  )}
+                  <span>Update Email Now ↵</span>
+                </button>
+              </div>
+            )}
 
             {/* Prompt suggestion chips */}
             <div className="space-y-1.5">
@@ -732,6 +775,7 @@ export default function Generator() {
               onTranslate={handleTranslate}
               selectedLanguage={language}
               hasGeneratedMessage={Boolean(body)}
+              isPromptModified={isPromptModified}
             />
           </div>
 

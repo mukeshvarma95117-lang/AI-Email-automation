@@ -181,21 +181,57 @@ function handleMockFallback(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/ai/generate')) {
-    let promptText = 'AI Workshop Announcement';
+    let promptText = 'Send a professional reminder to all students about tomorrow’s AI workshop at 10 AM.';
+    let tone = 'Professional';
+    let channel = 'email';
     try {
       if (options.body) {
         const parsed = JSON.parse(options.body);
         if (parsed.prompt) promptText = parsed.prompt;
+        if (parsed.tone) tone = parsed.tone;
+        if (parsed.channel) channel = parsed.channel;
       }
     } catch (e) {}
+
+    const lower = promptText.toLowerCase();
+
+    // Extract event name
+    let eventName = 'Hands-On AI Workshop';
+    const aboutMatch = promptText.match(/\babout\s+(?:tomorrow['’]s\s+|today['’]s\s+)?([^.!?\n]+?)(?:\s+at\s+\d|\s+on\s+|\s+in\s+|\.|\?|!|$)/i);
+    if (aboutMatch && aboutMatch[1].trim().length > 2 && aboutMatch[1].trim().length < 50) {
+      eventName = aboutMatch[1].trim().replace(/\b\w/g, c => c.toUpperCase());
+    } else if (lower.includes('hackathon')) eventName = 'Inter-College Hackathon';
+    else if (lower.includes('interview')) eventName = 'Technical Round Interview';
+    else if (lower.includes('exam') || lower.includes('test')) eventName = 'Mid-Term Examination';
+    else if (lower.includes('webinar')) eventName = 'Live Interactive Webinar';
+    else if (lower.includes('meeting') || lower.includes('discussion')) eventName = 'Team Project Discussion';
+    else if (lower.includes('workshop')) eventName = 'Hands-On AI Workshop';
+    else if (lower.includes('sale') || lower.includes('discount')) eventName = 'Exclusive Seasonal Offer';
+
+    // Extract time
+    let eventTime = '10:00 AM';
+    const timeMatch = promptText.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i);
+    if (timeMatch) eventTime = timeMatch[1].toUpperCase();
+
+    // Extract date
+    let eventDate = 'tomorrow';
+    const dateMatch = promptText.match(/\b(tomorrow|today|tonight|this\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+    if (dateMatch) eventDate = dateMatch[1];
+
+    let eventLocation = 'Lab 3B / Virtual Room';
+    const locMatch = promptText.match(/\b(?:in|at|via)\s+(Lab\s+[0-9A-Za-z]+|Room\s+[0-9A-Za-z]+|Zoom(?:\s+Room)?|Google Meet|Teams|Auditorium(?:\s+[0-9A-Za-z]+)?)\b/i);
+    if (locMatch) eventLocation = locMatch[1];
+
+    const greeting = tone === 'Formal' ? 'Respected {{name}},' : tone === 'Friendly' ? 'Hi {{name}}! 👋' : tone === 'Urgent' ? 'URGENT NOTICE: {{name}},' : 'Dear {{name}},';
+    const signoff = tone === 'Formal' ? 'With highest regards,\nDepartment Administration' : tone === 'Friendly' ? 'Cheers & see you there!\nThe Organizing Team' : 'Sincerely,\nAcademic & Event Coordination Team';
 
     return {
       success: true,
       data: {
-        subject: promptText.length > 50 ? `Update: ${promptText.slice(0, 48).trim()}...` : `Update: ${promptText.trim()}`,
-        body: `Hi {{name}},\n\nWe are excited to confirm the upcoming details regarding {{event}} on {{date}} at {{time}}.\n\nAll preparations are complete and your seat is reserved. Please let us know if you have any questions ahead of time.\n\nBest regards,\nThe SmartSend AI Team`,
-        short_version: `Reminder for {{name}}: {{event}} is confirmed for {{date}}.`,
-        cta: 'View Session Details',
+        subject: `${tone === 'Urgent' ? '[URGENT] ' : ''}Reminder: ${eventName} - ${eventDate.toUpperCase()} at ${eventTime}`,
+        body: `${greeting}\n\nThis is a reminder regarding your upcoming session for ${eventName} scheduled for ${eventDate} at ${eventTime}.\n\nSession Details:\n• Event: ${eventName}\n• Date & Time: ${eventDate} at ${eventTime}\n• Location: ${eventLocation}\n\nPlease review your preparation checklist and ensure your development environment is ready.\n\nIf you have any questions or schedule conflicts, please notify the coordinator as soon as possible.\n\n${signoff}`,
+        short_version: `Reminder: ${eventName} is scheduled for ${eventDate} at ${eventTime} in ${eventLocation}. Please arrive prepared.`,
+        cta: 'Join Session / View Schedule',
         modelUsed: 'SmartSend GenAI Engine (Built-in)',
         isMock: true,
         notice: 'Generated via built-in intelligent synthesizer.'

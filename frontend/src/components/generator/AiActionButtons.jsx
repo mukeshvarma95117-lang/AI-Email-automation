@@ -19,7 +19,8 @@ export default function AiActionButtons({
   onRewrite,
   onTranslate,
   selectedLanguage,
-  hasGeneratedMessage
+  hasGeneratedMessage,
+  isPromptModified = false
 }) {
   return (
     <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
@@ -48,14 +49,24 @@ export default function AiActionButtons({
           type="button"
           onClick={onRegenerate}
           disabled={isGenerating || isRewriting}
-          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-sm active:scale-95 disabled:opacity-50 transition-all cursor-pointer btn-lift btn-spin-hover"
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold shadow-sm active:scale-95 disabled:opacity-50 transition-all cursor-pointer btn-lift ${
+            isPromptModified
+              ? 'bg-gradient-to-r from-amber-500 via-indigo-600 to-indigo-700 hover:from-amber-600 hover:to-indigo-800 text-white shadow-md shadow-indigo-600/25 ring-2 ring-amber-400 ring-offset-2 dark:ring-offset-slate-900 animate-pulse'
+              : 'bg-indigo-600 hover:bg-indigo-700 text-white btn-spin-hover'
+          }`}
+          title={isPromptModified ? 'Prompt has modified instructions — click to regenerate email' : 'Regenerate copy with current settings'}
         >
           {isGenerating ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
             <RefreshCw className="w-3.5 h-3.5" />
           )}
-          <span>Regenerate</span>
+          <span>{isPromptModified ? 'Update with New Changes' : 'Regenerate'}</span>
+          {isPromptModified && (
+            <span className="ml-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-300 text-amber-950 uppercase tracking-wider">
+              Pending
+            </span>
+          )}
         </button>
       )}
 
