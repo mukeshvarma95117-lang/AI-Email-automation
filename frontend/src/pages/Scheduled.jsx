@@ -229,9 +229,13 @@ export default function Scheduled() {
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredList.map(item => {
                 let recipientCount = 0;
+                let recipientObjects = [];
                 try {
                   const arr = JSON.parse(item.recipients_json || '[]');
                   recipientCount = arr.length;
+                  if (arr.length > 0 && typeof arr[0] === 'object' && arr[0] !== null) {
+                    recipientObjects = arr;
+                  }
                 } catch (e) {
                   recipientCount = 0;
                 }
@@ -272,11 +276,22 @@ export default function Scheduled() {
                       </div>
                     </td>
 
-                    {/* Recipients Count */}
+                    {/* Recipients */}
                     <td className="px-6 py-4">
-                      <span className="font-bold text-slate-900 dark:text-white">
-                        {recipientCount} recipients
-                      </span>
+                      {recipientObjects.length > 0 ? (
+                        <div>
+                          <p className="font-bold text-slate-900 dark:text-white truncate max-w-[150px]">
+                            {recipientObjects[0].name || recipientObjects[0].email}
+                          </p>
+                          <p className="text-[10px] text-slate-400 truncate max-w-[150px]">
+                            {recipientObjects.length > 1 ? `+${recipientObjects.length - 1} other recipient${recipientObjects.length > 2 ? 's' : ''}` : recipientObjects[0].email}
+                          </p>
+                        </div>
+                      ) : (
+                        <span className="font-bold text-slate-900 dark:text-white">
+                          {recipientCount} recipient{recipientCount !== 1 ? 's' : ''}
+                        </span>
+                      )}
                     </td>
 
                     {/* Status Badge */}

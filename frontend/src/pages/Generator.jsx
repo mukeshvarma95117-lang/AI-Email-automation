@@ -546,6 +546,7 @@ export default function Generator() {
         isDemo: isDemoMode,
         demo_mode: isDemoMode ? 'true' : 'false',
         recipients: currentRecipients,
+        customRecipients: recipientMode === 'custom' ? customRecipients : null,
         groupId: recipientMode === 'group' ? (selectedGroupId && selectedGroupId !== 'all' ? Number(selectedGroupId) : 'all') : null,
         recipientIds: recipientMode === 'individual' ? selectedContactIds : currentRecipients.map(c => c.id),
         sendToAll: isAllGroup,

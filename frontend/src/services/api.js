@@ -995,11 +995,17 @@ export const api = {
 
     if (isSupabaseConfigured) {
       try {
+        const recipientsToStore = (Array.isArray(data.recipients) && data.recipients.length > 0)
+          ? data.recipients
+          : (Array.isArray(data.customRecipients) && data.customRecipients.length > 0)
+          ? data.customRecipients
+          : (data.recipientIds || []);
+
         const { data: sched, error } = await supabase.from('scheduled_messages').insert([{
           channel: data.channel || 'email',
           subject: data.subject || '',
           body: data.body || '',
-          recipients_json: JSON.stringify(data.recipientIds || data.recipients || []),
+          recipients_json: JSON.stringify(recipientsToStore),
           scheduled_time: utcScheduledTime,
           timezone: targetTz,
           status: 'scheduled',
@@ -1077,11 +1083,26 @@ export const api = {
             recipients = JSON.parse(job.recipients_json || '[]');
           } catch (e) {}
 
+          const hasObjects = Array.isArray(recipients) && recipients.length > 0 && typeof recipients[0] === 'object' && recipients[0] !== null;
+          let resolvedRecipients = hasObjects ? recipients : undefined;
+          let resolvedIds = !hasObjects && Array.isArray(recipients) ? recipients : [];
+
+          // If only IDs stored, resolve to full contacts from Supabase to preserve real personalized names
+          if (!hasObjects && resolvedIds.length > 0 && isSupabaseConfigured) {
+            try {
+              const { data: contactsData } = await supabase.from('contacts').select('*').in('id', resolvedIds);
+              if (Array.isArray(contactsData) && contactsData.length > 0) {
+                resolvedRecipients = contactsData;
+              }
+            } catch (e) {}
+          }
+
           const sendRes = await api.sendMessage({
             channel: job.channel || 'email',
             subject: job.subject,
             body: job.body,
-            recipientIds: Array.isArray(recipients) ? recipients : [],
+            recipients: resolvedRecipients,
+            recipientIds: resolvedIds,
             isDemo: Boolean(job.is_demo)
           });
 
@@ -1117,11 +1138,26 @@ export const api = {
                 let recipients = [];
                 try { recipients = JSON.parse(item.recipients_json || '[]'); } catch (e) {}
 
+                const hasObjects = Array.isArray(recipients) && recipients.length > 0 && typeof recipients[0] === 'object' && recipients[0] !== null;
+                let resolvedRecipients = hasObjects ? recipients : undefined;
+                let resolvedIds = !hasObjects && Array.isArray(recipients) ? recipients : [];
+
+                // If only IDs stored, resolve to full contacts from Supabase to preserve real personalized names
+                if (!hasObjects && resolvedIds.length > 0 && isSupabaseConfigured) {
+                  try {
+                    const { data: contactsData } = await supabase.from('contacts').select('*').in('id', resolvedIds);
+                    if (Array.isArray(contactsData) && contactsData.length > 0) {
+                      resolvedRecipients = contactsData;
+                    }
+                  } catch (e) {}
+                }
+
                 const sendRes = await api.sendMessage({
                   channel: item.channel || 'email',
                   subject: item.subject,
                   body: item.body,
-                  recipientIds: Array.isArray(recipients) ? recipients : [],
+                  recipients: resolvedRecipients,
+                  recipientIds: resolvedIds,
                   isDemo: Boolean(item.is_demo)
                 });
 
