@@ -14,6 +14,8 @@ export default function ConfirmationModal({
   emailProvider = 'resend',
   isEmailConfigured = true,
   isSmtpConfigured = true,
+  isSmsConfigured = false,
+  isWhatsappConfigured = false,
   hasNamePlaceholder = true,
   onSwitchToDemo,
   onOpenSettings
@@ -21,9 +23,11 @@ export default function ConfirmationModal({
   if (!isOpen) return null;
 
   const isLargeList = recipientCount > 50;
-  // If emailConfigured prop is passed, use it, else fallback to isSmtpConfigured
   const emailReady = isEmailConfigured !== undefined ? isEmailConfigured : isSmtpConfigured;
   const isEmailBlocked = channel === 'email' && !isDemo && !emailReady;
+  const isSmsBlocked = channel === 'sms' && !isDemo && !isSmsConfigured;
+  const isWhatsappBlocked = channel === 'whatsapp' && !isDemo && !isWhatsappConfigured;
+  const isDispatchBlocked = isEmailBlocked || isSmsBlocked || isWhatsappBlocked;
   const isResend = emailProvider === 'resend';
 
   return (
@@ -66,7 +70,7 @@ export default function ConfirmationModal({
                 <span>⚡ Live Delivery Mode</span>
               </span>
               <span className="text-[10px] bg-emerald-200/80 dark:bg-emerald-900 text-emerald-900 dark:text-emerald-200 px-2 py-0.5 rounded-full font-bold">
-                {isResend ? 'Real Resend Cloud API' : 'Real Outgoing SMTP'}
+                {channel === 'email' ? (isResend ? 'Real Resend Cloud API' : 'Real Outgoing SMTP') : (channel === 'sms' ? 'Twilio SMS Gateway' : 'WhatsApp Cloud API')}
               </span>
             </div>
           )}
@@ -82,7 +86,7 @@ export default function ConfirmationModal({
                 {isResend ? (
                   <>Live email delivery requires a Resend API key in Settings. Enter your key to send real emails to inboxes.</>
                 ) : (
-                  <>Gmail strictly does not accept your regular account password (e.g. "mukesh@2006"). You must generate a 16-character <strong>Google App Password</strong> in your Google Account Security settings.</>
+                  <>Gmail strictly does not accept your regular account password. You must generate a 16-character <strong>Google App Password</strong> in your Google Account Security settings.</>
                 )}
               </p>
               <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -109,6 +113,74 @@ export default function ConfirmationModal({
             </div>
           )}
 
+          {/* SMS Twilio Provider Missing Credentials Warning */}
+          {isSmsBlocked && (
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700/80 text-amber-900 dark:text-amber-200 space-y-2.5">
+              <div className="flex items-center gap-2 font-bold text-xs">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>Twilio SMS Gateway Required</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                To send real text messages to physical mobile phones in Live Mode, please configure your <strong>Twilio Account SID</strong> and <strong>Auth Token</strong> in Settings. Alternatively, switch to Demo Simulation Mode to safely test SMS delivery.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    onClick={onOpenSettings}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>Enter Twilio Keys in Settings</span>
+                  </button>
+                )}
+                {onSwitchToDemo && (
+                  <button
+                    type="button"
+                    onClick={onSwitchToDemo}
+                    className="px-3 py-1.5 rounded-lg border border-amber-400 dark:border-amber-600 bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 font-semibold text-[11px] hover:bg-amber-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    Switch to Demo Mode
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* WhatsApp Missing Credentials Warning */}
+          {isWhatsappBlocked && (
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/50 border border-amber-300 dark:border-amber-700/80 text-amber-900 dark:text-amber-200 space-y-2.5">
+              <div className="flex items-center gap-2 font-bold text-xs">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>WhatsApp Cloud API Required</span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-amber-800 dark:text-amber-300">
+                Live WhatsApp dispatch requires a Meta WhatsApp Token and Phone Number ID in Settings.
+              </p>
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                {onOpenSettings && (
+                  <button
+                    type="button"
+                    onClick={onOpenSettings}
+                    className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <Settings className="w-3.5 h-3.5" />
+                    <span>Configure in Settings</span>
+                  </button>
+                )}
+                {onSwitchToDemo && (
+                  <button
+                    type="button"
+                    onClick={onSwitchToDemo}
+                    className="px-3 py-1.5 rounded-lg border border-amber-400 dark:border-amber-600 bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 font-semibold text-[11px] hover:bg-amber-100 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                  >
+                    Switch to Demo Mode
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Main confirmation message */}
           <div className="p-4 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 flex items-start gap-3">
             <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-sm shrink-0 shadow">
@@ -116,7 +188,7 @@ export default function ConfirmationModal({
             </div>
             <div>
               <h4 className="font-semibold text-indigo-950 dark:text-indigo-200 text-sm mb-0.5">
-                {isDemo ? 'Simulation Confirmation' : 'Real Email Dispatch Confirmation'}
+                {isDemo ? 'Simulation Confirmation' : `${channel.toUpperCase()} Dispatch Confirmation`}
               </h4>
               <p className="text-slate-600 dark:text-slate-300">
                 You are about to send this message to <strong className="text-indigo-600 dark:text-indigo-400">{recipientCount} recipient{recipientCount !== 1 ? 's' : ''}</strong> via <strong className="capitalize">{channel}</strong>.
@@ -132,7 +204,7 @@ export default function ConfirmationModal({
                 <div>
                   <p className="font-semibold">Individual Personalization Active</p>
                   <p className="text-emerald-800 dark:text-emerald-300 leading-relaxed">
-                    Each recipient will receive their own separate email addressed to their own personal name in place of <code className="font-bold font-mono text-[10px]">{`{{name}}`}</code>.
+                    Each recipient will receive their own separate message addressed to their personal name in place of <code className="font-bold font-mono text-[10px]">{`{{name}}`}</code>.
                   </p>
                 </div>
               </div>
@@ -190,7 +262,7 @@ export default function ConfirmationModal({
           )}
 
           <div className="text-slate-500 dark:text-slate-400 text-[11px] leading-relaxed">
-            Please confirm that your copy and variable tags are reviewed. This action cannot be revoked once dispatched.
+            Please confirm that your copy and recipients are reviewed. This action cannot be revoked once dispatched.
           </div>
         </div>
 
@@ -207,13 +279,17 @@ export default function ConfirmationModal({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={isSending || isEmailBlocked}
+            disabled={isSending || isDispatchBlocked}
             className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
           >
             {isSending ? (
               <span>Dispatching...</span>
             ) : isEmailBlocked ? (
               <span>{isResend ? 'Resend Key Required' : 'App Password Required'}</span>
+            ) : isSmsBlocked ? (
+              <span>Twilio SMS Required</span>
+            ) : isWhatsappBlocked ? (
+              <span>WhatsApp Token Required</span>
             ) : (
               <>
                 <Send className="w-3.5 h-3.5" />
@@ -226,4 +302,3 @@ export default function ConfirmationModal({
     </div>
   );
 }
-

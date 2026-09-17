@@ -107,6 +107,8 @@ export default function Generator() {
   const [emailProvider, setEmailProvider] = useState('resend');
   const [userSmtpEmail, setUserSmtpEmail] = useState('');
   const [isEmailConfigured, setIsEmailConfigured] = useState(false);
+  const [isSmsConfigured, setIsSmsConfigured] = useState(false);
+  const [isWhatsappConfigured, setIsWhatsappConfigured] = useState(false);
 
   // Contact preview switcher
   const [previewContactIndex, setPreviewContactIndex] = useState(0);
@@ -142,6 +144,12 @@ export default function Generator() {
           const hasResend = Boolean(s.resend_api_key || s.resend_api_key_is_set);
           const hasSmtp = Boolean(s.email_user && (s.email_pass || s.email_pass_is_set));
           setIsEmailConfigured(provider === 'resend' ? hasResend : hasSmtp);
+
+          const hasSms = Boolean(s.sms_account_sid && s.sms_auth_token);
+          setIsSmsConfigured(hasSms);
+
+          const hasWhatsapp = Boolean(s.whatsapp_token && s.whatsapp_phone_number_id);
+          setIsWhatsappConfigured(hasWhatsapp);
         }
 
         const initialGroupId = searchParams.get('group') || (groupsRes.groups?.[0]?.id ? String(groupsRes.groups[0].id) : '');
@@ -181,37 +189,68 @@ export default function Generator() {
     const items = raw.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
     const newItems = [];
     const isSingleInput = items.length === 1;
+    const isPhoneChannel = channel === 'sms' || channel === 'whatsapp';
 
     for (const item of items) {
-      const angleMatch = item.match(/^(.*?)\s*<([^\s>]+@[^\s>]+\.[^\s>]+)>$/);
-      let email = '';
-      let name = '';
+      if (isPhoneChannel) {
+        const angleMatch = item.match(/^(.*?)\s*<([+\d\s\-()]+)>$/);
+        let phone = '';
+        let name = '';
 
-      if (angleMatch) {
-        name = angleMatch[1].trim();
-        email = angleMatch[2].trim().toLowerCase();
+        if (angleMatch) {
+          name = angleMatch[1].trim();
+          phone = angleMatch[2].trim();
+        } else {
+          phone = item;
+        }
+
+        const cleanPhone = phone.replace(/[^\d+]/g, '');
+        if (cleanPhone.length < 7) {
+          error(`"${item}" is not a valid phone number. Please include standard digits.`);
+          continue;
+        }
+
+        if (isSingleInput && customNameInput.trim()) {
+          name = customNameInput.trim();
+        }
+        if (!name) {
+          name = `Recipient (${cleanPhone})`;
+        }
+
+        if (!customRecipients.some(cr => cr.phone === cleanPhone)) {
+          newItems.push({ name, phone: cleanPhone, email: null });
+        }
       } else {
-        email = item.toLowerCase();
-      }
+        const angleMatch = item.match(/^(.*?)\s*<([^\s>]+@[^\s>]+\.[^\s>]+)>$/);
+        let email = '';
+        let name = '';
 
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        error(`"${item}" is not a valid email address.`);
-        continue;
-      }
+        if (angleMatch) {
+          name = angleMatch[1].trim();
+          email = angleMatch[2].trim().toLowerCase();
+        } else {
+          email = item.toLowerCase();
+        }
 
-      // If single item, use customNameInput if provided
-      if (isSingleInput && customNameInput.trim()) {
-        name = customNameInput.trim();
-      }
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          error(`"${item}" is not a valid email address.`);
+          continue;
+        }
 
-      // If name still empty or multiple batch items without embedded names, derive individual name from email prefix
-      if (!name) {
-        const prefix = email.split('@')[0].replace(/[._-]/g, ' ');
-        name = prefix.replace(/\b\w/g, c => c.toUpperCase());
-      }
+        // If single item, use customNameInput if provided
+        if (isSingleInput && customNameInput.trim()) {
+          name = customNameInput.trim();
+        }
 
-      if (!customRecipients.some(cr => cr.email.toLowerCase() === email)) {
-        newItems.push({ name, email });
+        // If name still empty or multiple batch items without embedded names, derive individual name from email prefix
+        if (!name) {
+          const prefix = email.split('@')[0].replace(/[._-]/g, ' ');
+          name = prefix.replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        if (!customRecipients.some(cr => cr.email?.toLowerCase() === email)) {
+          newItems.push({ name, email, phone: null });
+        }
       }
     }
 
@@ -223,7 +262,7 @@ export default function Generator() {
       });
       setCustomEmailInput('');
       setCustomNameInput('');
-      success(`Added ${newItems.length} recipient${newItems.length > 1 ? 's with individual names' : ''}.`);
+      success(`Added ${newItems.length} recipient${newItems.length > 1 ? 's' : ''}.`);
     }
   };
 
@@ -375,9 +414,9 @@ export default function Generator() {
     ? contacts.filter(c => selectedContactIds.includes(c.id))
     : customRecipients.map((cr, idx) => ({
         id: -(idx + 1),
-        name: cr.name || 'Direct Recipient',
-        email: cr.email,
-        phone: null,
+        name: cr.name || (cr.phone ? 'Phone Recipient' : 'Direct Recipient'),
+        email: cr.email || null,
+        phone: cr.phone || null,
         custom_fields: {}
       }));
 
@@ -660,20 +699,36 @@ export default function Generator() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-bold text-sm">
-                  {isDemoMode ? 'Demo Simulation Mode Active' : 'Live Delivery Active — Real Inboxes Connected'}
+                  {isDemoMode
+                    ? 'Demo Simulation Mode Active'
+                    : (channel === 'sms'
+                        ? 'Live Delivery Active — Cellular SMS Gateway'
+                        : channel === 'whatsapp'
+                        ? 'Live Delivery Active — WhatsApp Cloud API'
+                        : 'Live Delivery Active — Real Inboxes Connected')}
                 </span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
                   isDemoMode
                     ? 'bg-amber-200/80 text-amber-900 dark:bg-amber-900 dark:text-amber-100'
                     : 'bg-emerald-200/80 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100'
                 }`}>
-                  {isDemoMode ? 'Simulated Dispatch' : 'Real SMTP Delivery'}
+                  {isDemoMode
+                    ? 'Simulated Dispatch'
+                    : (channel === 'sms'
+                        ? 'Twilio SMS Gateway'
+                        : channel === 'whatsapp'
+                        ? 'Meta WhatsApp API'
+                        : (emailProvider === 'resend' ? 'Resend Cloud' : 'Real SMTP'))}
                 </span>
               </div>
               <p className="text-[11px] opacity-90 mt-0.5">
                 {isDemoMode
-                  ? 'Dispatches will be simulated safely without contacting real SMTP servers or exhausting quotas. Switch to Live Delivery to send real emails to real people.'
-                  : 'All messages sent from this composer will be transmitted to real people in their real inboxes via your configured SMTP server.'}
+                  ? `Dispatches will be simulated safely to recipient ${channel === 'email' ? 'email addresses' : 'mobile phone numbers'} without contacting carriers or exhausting quotas. Switch to Live Delivery to transmit real messages.`
+                  : (channel === 'sms'
+                      ? 'Messages will be dispatched directly to recipients’ physical cellular phones via Twilio SMS.'
+                      : channel === 'whatsapp'
+                      ? 'Messages will be dispatched directly to recipients via Meta WhatsApp Cloud API.'
+                      : 'All messages sent from this composer will be transmitted to real people in their real inboxes via your configured SMTP / Resend server.')}
               </p>
             </div>
           </div>
@@ -691,6 +746,7 @@ export default function Generator() {
           </button>
         </div>
 
+        {/* Missing Email Credentials Warning */}
         {!isDemoMode && channel === 'email' && !isEmailConfigured && (
           <div className="pt-2.5 mt-1 border-t border-emerald-200/70 dark:border-emerald-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-500/10 p-2.5 rounded-xl">
             <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium">
@@ -701,6 +757,64 @@ export default function Generator() {
                 ) : (
                   <><strong>Google App Password Missing:</strong> Live email via Gmail requires a 16-character Google App Password in Settings (regular account passwords like "mukesh@2006" will fail).</>
                 )}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => navigate('/settings')}
+                className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <SettingsIcon className="w-3.5 h-3.5" />
+                <span>Configure in Settings</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleDemoMode}
+                className="px-3 py-1 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 font-semibold text-[11px] hover:bg-amber-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Switch to Demo Mode
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Missing SMS Twilio Credentials Warning */}
+        {!isDemoMode && channel === 'sms' && !isSmsConfigured && (
+          <div className="pt-2.5 mt-1 border-t border-emerald-200/70 dark:border-emerald-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-500/10 p-2.5 rounded-xl">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>
+                <strong>Twilio SMS Gateway Missing:</strong> Live SMS requires a Twilio Account SID and Auth Token in Settings to deliver text messages to mobile phones.
+              </span>
+            </div>
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => navigate('/settings')}
+                className="px-3 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-[11px] shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
+              >
+                <SettingsIcon className="w-3.5 h-3.5" />
+                <span>Configure in Settings</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleDemoMode}
+                className="px-3 py-1 rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-800 text-amber-900 dark:text-amber-200 font-semibold text-[11px] hover:bg-amber-50 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+              >
+                Switch to Demo Mode
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Missing WhatsApp Credentials Warning */}
+        {!isDemoMode && channel === 'whatsapp' && !isWhatsappConfigured && (
+          <div className="pt-2.5 mt-1 border-t border-emerald-200/70 dark:border-emerald-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-amber-500/10 p-2.5 rounded-xl">
+            <div className="flex items-center gap-2 text-amber-800 dark:text-amber-300 font-medium">
+              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+              <span>
+                <strong>WhatsApp Cloud API Missing:</strong> Live WhatsApp delivery requires a WhatsApp Token and Phone Number ID in Settings.
               </span>
             </div>
             <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
@@ -1153,7 +1267,19 @@ export default function Generator() {
                               {c.name}
                             </span>
                             <span className="text-slate-400 truncate text-[11px]">
-                              ({c.email || c.phone})
+                              {channel === 'sms' || channel === 'whatsapp' ? (
+                                c.phone ? (
+                                  <span>{c.phone}</span>
+                                ) : (
+                                  <span className="text-rose-500 font-medium">⚠️ No phone number</span>
+                                )
+                              ) : (
+                                c.email ? (
+                                  <span>{c.email}</span>
+                                ) : (
+                                  <span className="text-rose-500 font-medium">⚠️ No email address</span>
+                                )
+                              )}
                             </span>
                           </label>
                           {isCurrentlyPreviewed && (
@@ -1169,12 +1295,12 @@ export default function Generator() {
               </div>
             )}
 
-            {/* Recipient Mode 3: Custom / Direct Email Addresses */}
+            {/* Recipient Mode 3: Custom / Direct Email Addresses or Phone Numbers */}
             {recipientMode === 'custom' && (
               <div className="space-y-3 text-xs">
                 <div className="flex items-center justify-between">
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    Paste multiple email addresses (comma, semicolon, or line-separated) to dispatch to multiple persons at once.
+                    Paste multiple {channel === 'email' ? 'email addresses' : 'phone numbers'} (comma, semicolon, or line-separated) to dispatch to multiple persons at once.
                   </p>
                   {customRecipients.length > 0 && (
                     <button
@@ -1199,7 +1325,7 @@ export default function Generator() {
                     <div className="sm:col-span-2 flex gap-2">
                       <input
                         type="text"
-                        placeholder="email@example.com (or comma-separated)"
+                        placeholder={channel === 'email' ? 'email@example.com (or comma-separated)' : '+91 98765 43210 (or comma-separated)'}
                         value={customEmailInput}
                         onChange={e => setCustomEmailInput(e.target.value)}
                         className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -1215,8 +1341,8 @@ export default function Generator() {
                   </div>
                 </form>
 
-                {/* Quick Add My Email Preset Button */}
-                {userSmtpEmail && (
+                {/* Quick Add My Email Preset Button (Only for email channel) */}
+                {channel === 'email' && userSmtpEmail && (
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -1233,7 +1359,7 @@ export default function Generator() {
                 <div className="space-y-1.5 max-h-40 overflow-y-auto border border-slate-100 dark:border-slate-800 rounded-xl p-2 bg-slate-50/50 dark:bg-slate-950/40">
                   {customRecipients.length === 0 ? (
                     <p className="text-[11px] text-slate-400 text-center py-4">
-                      No direct recipients added yet. Enter an email address above to add.
+                      No direct recipients added yet. Enter {channel === 'email' ? 'an email address' : 'a phone number'} above to add.
                     </p>
                   ) : (
                     customRecipients.map((cr, idx) => {
@@ -1256,7 +1382,7 @@ export default function Generator() {
                               {cr.name}
                             </span>
                             <span className="text-slate-400 font-mono text-[10px] truncate">
-                              &lt;{cr.email}&gt;
+                              &lt;{channel === 'email' ? cr.email : (cr.phone || cr.email)}&gt;
                             </span>
                             {isCurrentlyPreviewed && (
                               <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 shrink-0 pl-1.5">
@@ -1455,6 +1581,8 @@ export default function Generator() {
         emailProvider={emailProvider}
         isEmailConfigured={isEmailConfigured}
         isSmtpConfigured={isEmailConfigured}
+        isSmsConfigured={isSmsConfigured}
+        isWhatsappConfigured={isWhatsappConfigured}
         hasNamePlaceholder={Boolean(body.includes('{{name}}') || body.includes('{{first_name}}'))}
         onSwitchToDemo={async () => {
           await handleToggleDemoMode();

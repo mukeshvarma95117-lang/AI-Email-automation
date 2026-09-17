@@ -24,8 +24,19 @@ export async function sendSms({ to, body }) {
     };
   }
 
-  // Demo Mode or unconfigured
-  if (config.demoMode || !config.isConfigured) {
+  // Live mode with missing configuration
+  if (!config.demoMode && !config.isConfigured) {
+    return {
+      success: false,
+      isDemo: false,
+      status: 'Failed',
+      recipient: cleanPhone,
+      error: 'Twilio SMS Gateway credentials (Account SID and Auth Token) are not configured in Settings.'
+    };
+  }
+
+  // Demo Mode
+  if (config.demoMode) {
     await new Promise(res => setTimeout(res, 200));
     return {
       success: true,
@@ -33,7 +44,7 @@ export async function sendSms({ to, body }) {
       status: 'Demo Sent',
       messageId: `demo-sms-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
       recipient: cleanPhone,
-      info: config.isConfigured ? 'Dispatched in Demo Mode' : 'Simulated (SMS Gateway Credentials Not Configured)'
+      info: 'Dispatched in Demo Simulation Mode'
     };
   }
 

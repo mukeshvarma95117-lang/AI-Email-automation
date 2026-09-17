@@ -335,10 +335,10 @@ function handleMockFallback(endpoint, options = {}) {
   if (endpoint.startsWith('/messages/send')) {
     let isDemo = false;
     let recipientCount = 1;
-    let target = 'mukeshvarma95117@gmail.com';
+    let channel = 'email';
     let subject = 'Workspace Announcement';
     let body = 'Hi there, your message has been dispatched successfully.';
-    let channel = 'email';
+    let target = '';
     try {
       if (options.body) {
         const parsed = JSON.parse(options.body);
@@ -348,9 +348,17 @@ function handleMockFallback(endpoint, options = {}) {
         if (parsed.channel) channel = parsed.channel;
         if (parsed.subject) subject = parsed.subject;
         if (parsed.body) body = parsed.body;
-        if (parsed.customRecipients?.[0]?.email) target = parsed.customRecipients[0].email;
+        if (parsed.customRecipients?.[0]) {
+          target = (channel === 'email' ? parsed.customRecipients[0].email : parsed.customRecipients[0].phone) || '';
+        } else if (parsed.recipients?.[0]) {
+          target = (channel === 'email' ? parsed.recipients[0].email : parsed.recipients[0].phone) || '';
+        }
       }
     } catch (e) {}
+
+    if (!target) {
+      target = channel === 'email' ? 'mukeshvarma95117@gmail.com' : '+91 98765 43210';
+    }
 
     try {
       const existing = localStorage.getItem('smartsend_delivery_logs');
@@ -364,7 +372,7 @@ function handleMockFallback(endpoint, options = {}) {
         rendered_body: body,
         status: isDemo ? 'Demo Sent' : 'Sent',
         is_demo: isDemo ? 1 : 0,
-        error_message: isDemo ? 'Delivered via Demo Simulation' : 'Live Delivery',
+        error_message: isDemo ? 'Delivered via Demo Simulation' : `${channel.toUpperCase()} Live Delivery`,
         delivery_timestamp: new Date().toISOString()
       });
       localStorage.setItem('smartsend_delivery_logs', JSON.stringify(logs.slice(0, 100)));
@@ -802,12 +810,23 @@ export const api = {
 
     let resendApiKey = '';
     let resendFrom = 'SmartSend AI <notifications@smartsendai.online>';
+    let smsAccountSid = '';
+    let smsAuthToken = '';
+    let smsFromNumber = '+15550100';
+    let whatsappToken = '';
+    let whatsappPhoneNumberId = '';
+
     try {
       const saved = localStorage.getItem('smartsend_settings');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed.resend_api_key) resendApiKey = parsed.resend_api_key;
         if (parsed.resend_from) resendFrom = parsed.resend_from;
+        if (parsed.sms_account_sid) smsAccountSid = parsed.sms_account_sid;
+        if (parsed.sms_auth_token) smsAuthToken = parsed.sms_auth_token;
+        if (parsed.sms_from_number) smsFromNumber = parsed.sms_from_number;
+        if (parsed.whatsapp_token) whatsappToken = parsed.whatsapp_token;
+        if (parsed.whatsapp_phone_number_id) whatsappPhoneNumberId = parsed.whatsapp_phone_number_id;
       }
     } catch (e) {}
 
@@ -815,22 +834,36 @@ export const api = {
       ...data,
       isDemo,
       resendApiKey: data.resendApiKey || resendApiKey,
-      resendFrom: data.resendFrom || resendFrom
+      resendFrom: data.resendFrom || resendFrom,
+      smsAccountSid: data.smsAccountSid || smsAccountSid,
+      smsAuthToken: data.smsAuthToken || smsAuthToken,
+      smsFromNumber: data.smsFromNumber || smsFromNumber,
+      whatsappToken: data.whatsappToken || whatsappToken,
+      whatsappPhoneNumberId: data.whatsappPhoneNumberId || whatsappPhoneNumberId
     };
 
     const isLocal = typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
     const hasCustomApiUrl = Boolean(import.meta.env.VITE_API_URL);
+
+    const resolveTarget = (r) => {
+      if (!r) return 'N/A';
+      if (data.channel === 'sms' || data.channel === 'whatsapp') {
+        return r.phone || r.target || 'N/A';
+      }
+      return r.email || r.target || 'N/A';
+    };
 
     // If local backend or custom backend URL is configured, use backend API
     if (isLocal || hasCustomApiUrl) {
       const res = await request('/messages/send', { method: 'POST', body: JSON.stringify(payload) });
       if (res && res.success) {
         try {
+          const defaultTarget = resolveTarget(data.recipients?.[0] || data.customRecipients?.[0]);
           const deliveryList = Array.isArray(res.deliveryResults) && res.deliveryResults.length > 0
             ? res.deliveryResults
             : [{
                 contact_name: data.recipients?.[0]?.name || data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Recipient'),
-                target: data.recipients?.[0]?.email || data.customRecipients?.[0]?.email || 'N/A',
+                target: defaultTarget,
                 renderedSubject: data.subject || '',
                 renderedBody: data.body || '',
                 status: isDemo ? 'Demo Sent' : 'Sent',
@@ -843,12 +876,12 @@ export const api = {
               id: Date.now() + Math.floor(Math.random() * 1000),
               channel: data.channel || 'email',
               contact_name: item.contactName || item.contact_name || 'Recipient',
-              contact_target: item.target || item.contact_target || '',
+              contact_target: item.target || item.contact_target || defaultTarget,
               rendered_subject: item.renderedSubject || data.subject,
               rendered_body: item.renderedBody || data.body,
               status: item.status || (isDemo ? 'Demo Sent' : 'Sent'),
               is_demo: isDemo ? 1 : 0,
-              error_message: isDemo ? 'Delivered via Demo Simulation' : 'Live Delivery',
+              error_message: isDemo ? 'Delivered via Demo Simulation' : (item.smsId ? `Twilio SMS SID: ${item.smsId}` : (item.resendId ? `Resend Message ID: ${item.resendId}` : `${(data.channel || 'message').toUpperCase()} Live Delivery`)),
               delivery_timestamp: new Date().toISOString()
             });
           }
@@ -867,25 +900,25 @@ export const api = {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (resp.ok) {
-        serverlessRes = await resp.json();
-        serverlessSuccess = Boolean(serverlessRes && serverlessRes.success);
-      }
+      serverlessRes = await resp.json();
+      serverlessSuccess = resp.ok && Boolean(serverlessRes && serverlessRes.success);
     } catch (e) {
       console.warn('Vercel serverless dispatch fallback:', e);
     }
 
     if (serverlessSuccess) {
+      const defaultTarget = resolveTarget(data.recipients?.[0] || data.customRecipients?.[0]);
       const deliveryList = Array.isArray(serverlessRes.deliveryResults) && serverlessRes.deliveryResults.length > 0
         ? serverlessRes.deliveryResults
         : [{
             contact_name: data.recipients?.[0]?.name || data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Recipient'),
-            target: data.recipients?.[0]?.email || data.customRecipients?.[0]?.email || 'N/A',
+            target: defaultTarget,
             renderedSubject: data.subject || '',
             renderedBody: data.body || '',
             status: isDemo ? 'Demo Sent' : 'Sent',
             isDemo,
-            resendId: serverlessRes.resendId
+            resendId: serverlessRes.resendId,
+            smsId: serverlessRes.smsId
           }];
 
       // Record in localStorage
@@ -893,16 +926,27 @@ export const api = {
         const existing = localStorage.getItem('smartsend_delivery_logs');
         const logs = existing ? JSON.parse(existing) : [];
         for (const item of deliveryList) {
+          const itemTarget = item.target || defaultTarget;
+          const errorMsg = isDemo
+            ? 'Delivered via Demo Simulation'
+            : (item.error
+                ? item.error
+                : (item.smsId
+                    ? `Twilio SMS SID: ${item.smsId}`
+                    : (item.resendId
+                        ? `Resend Message ID: ${item.resendId}`
+                        : (serverlessRes.message || `${(data.channel || 'message').toUpperCase()} Live Delivery`))));
+
           logs.unshift({
             id: Date.now() + Math.floor(Math.random() * 1000),
             channel: data.channel || 'email',
-            contact_name: item.contact_name,
-            contact_target: item.target,
+            contact_name: item.contact_name || item.contactName || 'Recipient',
+            contact_target: itemTarget,
             rendered_subject: item.renderedSubject || data.subject,
             rendered_body: item.renderedBody || data.body,
             status: item.status || (isDemo ? 'Demo Sent' : 'Sent'),
             is_demo: isDemo ? 1 : 0,
-            error_message: isDemo ? 'Delivered via Demo Simulation' : (item.resendId ? `Resend Message ID: ${item.resendId}` : (serverlessRes.message || 'Live Delivery via Resend Cloud API')),
+            error_message: errorMsg,
             delivery_timestamp: new Date().toISOString()
           });
         }
@@ -920,22 +964,33 @@ export const api = {
             cta: data.cta || '',
             channel: data.channel || 'email',
             recipient_count: deliveryList.length,
-            recipients_json: JSON.stringify(deliveryList.map(d => d.target)),
+            recipients_json: JSON.stringify(deliveryList.map(d => d.target || defaultTarget)),
             status: isDemo ? 'demo_sent' : 'sent',
             is_demo: isDemo ? 1 : 0
           }]).select().single();
 
           for (const item of deliveryList) {
+            const itemTarget = item.target || defaultTarget;
+            const errorMsg = isDemo
+              ? 'Delivered via Demo Simulation'
+              : (item.error
+                  ? item.error
+                  : (item.smsId
+                      ? `Twilio SMS SID: ${item.smsId}`
+                      : (item.resendId
+                          ? `Resend Message ID: ${item.resendId}`
+                          : (serverlessRes.message || `${(data.channel || 'message').toUpperCase()} Live Delivery`))));
+
             await supabase.from('message_logs').insert([{
               message_id: msg?.id || null,
               channel: data.channel || 'email',
-              contact_name: item.contact_name,
-              contact_target: item.target,
+              contact_name: item.contact_name || item.contactName || 'Recipient',
+              contact_target: itemTarget,
               rendered_subject: item.renderedSubject || data.subject,
               rendered_body: item.renderedBody || data.body,
               status: item.status || (isDemo ? 'Demo Sent' : 'Sent'),
               is_demo: isDemo ? 1 : 0,
-              error_message: isDemo ? 'Delivered via Demo Simulation' : `Resend Message ID: ${item.resendId || 'Delivered'}`,
+              error_message: errorMsg,
               delivery_timestamp: new Date().toISOString()
             }]);
           }
@@ -946,7 +1001,7 @@ export const api = {
     }
 
     if (!serverlessSuccess && !isLocal && !hasCustomApiUrl) {
-      const errorMsg = serverlessRes?.error || 'Live delivery failed via Resend. Please check your API key and recipient email.';
+      const errorMsg = serverlessRes?.error || `Live delivery failed for ${data.channel || 'message'}. Please check your credentials in Settings.`;
       throw new Error(errorMsg);
     }
 
@@ -1006,8 +1061,9 @@ export const api = {
           : (Array.isArray(data.customRecipients) && data.customRecipients.length > 0)
           ? data.customRecipients.map(cr => ({
               id: null,
-              name: cr.name || (cr.email ? cr.email.split('@')[0] : 'Recipient'),
-              email: cr.email || null
+              name: cr.name || (cr.email ? cr.email.split('@')[0] : (cr.phone || 'Recipient')),
+              email: cr.email || null,
+              phone: cr.phone || null
             }))
           : (data.recipientIds || []);
 
