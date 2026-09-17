@@ -1,7 +1,8 @@
 import React from 'react';
 import { Phone, Video, MoreVertical, CheckCheck, Smile, Paperclip, Mic, Send } from 'lucide-react';
 
-export default function WhatsAppPreview({ contactName = 'Student Contact', contactPhone = '+1 555-0192', text = '', cta = '' }) {
+export default function WhatsAppPreview({ contactName = 'Student Contact', contactPhone = '+1 555-0192', text = '', cta = '', timestamp = '' }) {
+  const displayTime = timestamp || new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
   // Format basic whatsapp bold (*bold* -> <strong>) and italic (_italic_ -> <em>)
   const formatWhatsAppText = (raw) => {
     if (!raw) return 'No message content...';
@@ -80,7 +81,7 @@ export default function WhatsAppPreview({ contactName = 'Student Contact', conta
 
             {/* Timestamp & read ticks */}
             <div className="flex items-center justify-end gap-1 mt-1 text-[9px] text-emerald-200/80">
-              <span>10:02 AM</span>
+              <span>{displayTime}</span>
               <CheckCheck className="w-3.5 h-3.5 text-cyan-400" />
             </div>
           </div>

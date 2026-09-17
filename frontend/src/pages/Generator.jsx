@@ -59,12 +59,9 @@ export default function Generator() {
   const { success, error, info } = useToast();
 
   // Prompt configuration state
-  const [prompt, setPrompt] = useState(
-    'Send a professional reminder to all students about tomorrow’s AI workshop at 10 AM.'
-  );
-  const [lastGeneratedPrompt, setLastGeneratedPrompt] = useState(
-    'Send a professional reminder to all students about tomorrow’s AI workshop at 10 AM.'
-  );
+  const defaultInitialPrompt = 'Send a professional reminder to all students about tomorrow’s AI workshop at 10 AM.';
+  const [prompt, setPrompt] = useState(defaultInitialPrompt);
+  const [lastGeneratedPrompt, setLastGeneratedPrompt] = useState(defaultInitialPrompt);
   const [tone, setTone] = useState('Professional');
   const [language, setLanguage] = useState('English');
   const [channel, setChannel] = useState('email');
@@ -72,12 +69,16 @@ export default function Generator() {
   const [length, setLength] = useState('Medium');
 
   // Generated content state
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-  const [shortVersion, setShortVersion] = useState('');
-  const [cta, setCta] = useState('');
-  const [modelUsed, setModelUsed] = useState('');
-  const [isMock, setIsMock] = useState(false);
+  const [subject, setSubject] = useState('Reminder: Hands-On AI Workshop - TOMORROW at 10:00 AM');
+  const [body, setBody] = useState(
+    `Dear {{name}},\n\nThis is a reminder regarding your upcoming session for Hands-On AI Workshop scheduled for tomorrow at 10:00 AM.\n\nSession Details:\n• Event: Hands-On AI Workshop\n• Date & Time: tomorrow at 10:00 AM\n• Location: Lab 3B / Virtual Room\n\nPlease review your preparation checklist and ensure your development environment is ready.\n\nIf you have any questions or schedule conflicts, please notify the coordinator as soon as possible.\n\nSincerely,\nAcademic & Event Coordination Team`
+  );
+  const [shortVersion, setShortVersion] = useState(
+    'Reminder: Hands-On AI Workshop is scheduled for tomorrow at 10:00 AM in Lab 3B / Virtual Room. Please arrive prepared.'
+  );
+  const [cta, setCta] = useState('Join Session / View Schedule');
+  const [modelUsed, setModelUsed] = useState('SmartSend Built-in Engine');
+  const [isMock, setIsMock] = useState(true);
   const [aiNotice, setAiNotice] = useState('');
 
   // Editing toggle
@@ -395,7 +396,9 @@ export default function Generator() {
 
     // Time (e.g. 11 AM, 11:00 AM, 11am, 2:30 PM, 9 PM)
     const timeMatch = prompt.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i);
-    if (timeMatch) vars.time = timeMatch[1].toUpperCase();
+    if (timeMatch) {
+      vars.time = timeMatch[1].toUpperCase().replace(/\s*(AM|PM)/, ' $1').trim();
+    }
 
     // Date
     const dateMatch = prompt.match(/\b(tomorrow|today|tonight|this\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
@@ -416,20 +419,27 @@ export default function Generator() {
   })();
 
   // Live variable substituted preview text
-  const renderedSubject = substituteVariables(subject, currentPreviewContact, activePromptGlobalVars);
-  const renderedBody = substituteVariables(body, currentPreviewContact, activePromptGlobalVars);
+  let renderedSubject = substituteVariables(subject, currentPreviewContact, activePromptGlobalVars);
+  let renderedBody = substituteVariables(body, currentPreviewContact, activePromptGlobalVars);
+
+  // If prompt has an explicit time, ensure rendered preview immediately synchronizes on every keystroke
+  if (activePromptGlobalVars.time) {
+    const timePattern = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)\b/gi;
+    renderedBody = renderedBody.replace(timePattern, activePromptGlobalVars.time);
+    renderedSubject = renderedSubject.replace(timePattern, activePromptGlobalVars.time);
+  }
 
   // Check if description prompt has been modified since last generation
   const isPromptModified = Boolean(body) && prompt.trim().length > 0 && prompt.trim() !== lastGeneratedPrompt.trim();
 
-  // Auto-regenerate when prompt changes (debounced by 800ms) when user is not manually editing copy
+  // Auto-regenerate when prompt changes (debounced by 600ms) when user is not manually editing copy
   useEffect(() => {
     if (!body || isEditing || !prompt.trim() || prompt.trim() === lastGeneratedPrompt.trim()) {
       return;
     }
     const timer = setTimeout(() => {
       handleGenerate();
-    }, 800);
+    }, 600);
     return () => clearTimeout(timer);
   }, [prompt, tone, language, channel, messageType, length, body, isEditing, lastGeneratedPrompt]);
 
@@ -1318,6 +1328,7 @@ export default function Generator() {
                   contactPhone={currentPreviewContact.phone}
                   text={renderedBody}
                   cta={cta}
+                  timestamp={activePromptGlobalVars.time || ''}
                 />
               )}
 
@@ -1328,6 +1339,7 @@ export default function Generator() {
                   subject={renderedSubject}
                   body={renderedBody}
                   cta={cta}
+                  timestamp={activePromptGlobalVars.time || ''}
                 />
               )}
 
@@ -1336,6 +1348,7 @@ export default function Generator() {
                   contactName={currentPreviewContact.name}
                   contactPhone={currentPreviewContact.phone}
                   text={renderedBody}
+                  timestamp={activePromptGlobalVars.time || ''}
                 />
               )}
             </div>

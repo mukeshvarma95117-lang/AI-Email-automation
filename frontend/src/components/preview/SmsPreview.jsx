@@ -1,9 +1,10 @@
 import React from 'react';
 import { Smartphone, Signal, Wifi, BatteryMedium, Send } from 'lucide-react';
 
-export default function SmsPreview({ contactName = 'Student Contact', contactPhone = '+1 555-0192', text = '' }) {
+export default function SmsPreview({ contactName = 'Student Contact', contactPhone = '+1 555-0192', text = '', timestamp = '' }) {
   const charCount = text ? text.length : 0;
   const segments = Math.ceil(charCount / 160) || 1;
+  const displayTime = timestamp || new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 
   return (
     <div className="w-full max-w-sm mx-auto rounded-[36px] p-3 bg-slate-900 shadow-2xl border-4 border-slate-700/80 select-none overflow-hidden">
@@ -40,7 +41,7 @@ export default function SmsPreview({ contactName = 'Student Contact', contactPho
         {/* SMS Chat Body */}
         <div className="flex-1 p-4 overflow-y-auto flex flex-col justify-end space-y-3">
           <div className="flex justify-center">
-            <span className="text-[10px] text-slate-400 font-medium">Text Message • Today 10:00 AM</span>
+            <span className="text-[10px] text-slate-400 font-medium">Text Message • Today {displayTime}</span>
           </div>
 
           {/* Incoming message bubble */}

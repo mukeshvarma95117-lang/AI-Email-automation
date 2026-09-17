@@ -38,12 +38,19 @@ export function substituteVariables(text, contact = {}, globalVars = {}) {
     ...globalVars
   };
 
-  return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
+  const substituted = text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {
     const key = varName.trim();
     const foundKey = Object.keys(merged).find(k => k.toLowerCase() === key.toLowerCase());
     return (foundKey && merged[foundKey] !== undefined && merged[foundKey] !== '') 
       ? merged[foundKey] 
       : match;
   });
+
+  if (globalVars && globalVars.time) {
+    const timePattern = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)\b/gi;
+    return substituted.replace(timePattern, globalVars.time);
+  }
+
+  return substituted;
 }
 

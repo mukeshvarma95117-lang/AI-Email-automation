@@ -68,8 +68,14 @@ export function resolveVariables(text, contact = {}, globalVars = {}) {
     }
   });
 
+  let finalText = replacedText;
+  if (globalVars && globalVars.time) {
+    const timePattern = /\b\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)\b/gi;
+    finalText = finalText.replace(timePattern, globalVars.time);
+  }
+
   return {
-    text: replacedText,
+    text: finalText,
     unresolvedVariables: Array.from(new Set(unresolved)),
     isFullyResolved: unresolved.length === 0
   };

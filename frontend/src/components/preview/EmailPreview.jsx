@@ -6,8 +6,11 @@ export default function EmailPreview({
   contactEmail = 'student@example.edu',
   subject = '',
   body = '',
-  cta = 'Confirm Attendance'
+  cta = 'Confirm Attendance',
+  timestamp = ''
 }) {
+  const displayTime = timestamp || new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+
   return (
     <div className="w-full max-w-xl mx-auto rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden select-none">
       {/* Email Client Header Bar */}
@@ -43,7 +46,7 @@ export default function EmailPreview({
               </span>
             </div>
           </div>
-          <span className="text-[11px] text-slate-400 shrink-0">Today, 10:00 AM</span>
+          <span className="text-[11px] text-slate-400 shrink-0 font-medium">Today, {displayTime}</span>
         </div>
 
         {/* Subject Line */}
