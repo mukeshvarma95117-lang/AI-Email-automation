@@ -14,6 +14,7 @@ export default function ConfirmationModal({
   emailProvider = 'resend',
   isEmailConfigured = true,
   isSmtpConfigured = true,
+  hasNamePlaceholder = true,
   onSwitchToDemo,
   onOpenSettings
 }) {
@@ -122,6 +123,31 @@ export default function ConfirmationModal({
               </p>
             </div>
           </div>
+
+          {/* Personalization Status */}
+          {recipientCount > 1 && (
+            hasNamePlaceholder ? (
+              <div className="p-3 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 flex items-start gap-2.5 text-[11px] text-emerald-900 dark:text-emerald-200">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">Individual Personalization Active</p>
+                  <p className="text-emerald-800 dark:text-emerald-300 leading-relaxed">
+                    Each recipient will receive their own separate email addressed to their own personal name in place of <code className="font-bold font-mono text-[10px]">{`{{name}}`}</code>.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-700 text-[11px] text-amber-900 dark:text-amber-200 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold">No Dynamic Name Tag</p>
+                  <p className="text-amber-800 dark:text-amber-300 leading-relaxed">
+                    Your message does not contain <code className="font-bold font-mono text-[10px]">{`{{name}}`}</code>. All {recipientCount} recipients will receive the identical text without personalized names.
+                  </p>
+                </div>
+              </div>
+            )
+          )}
 
           {/* Unresolved Variables Warning */}
           {unresolvedVariables.length > 0 && (

@@ -192,7 +192,7 @@ function handleMockFallback(endpoint, options = {}) {
     return {
       success: true,
       data: {
-        subject: `Update regarding ${promptText.slice(0, 35)} for {{name}}`,
+        subject: promptText.length > 50 ? `Update: ${promptText.slice(0, 48).trim()}...` : `Update: ${promptText.trim()}`,
         body: `Hi {{name}},\n\nWe are excited to confirm the upcoming details regarding {{event}} on {{date}} at {{time}}.\n\nAll preparations are complete and your seat is reserved. Please let us know if you have any questions ahead of time.\n\nBest regards,\nThe SmartSend AI Team`,
         short_version: `Reminder for {{name}}: {{event}} is confirmed for {{date}}.`,
         cta: 'View Session Details',

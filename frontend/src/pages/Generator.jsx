@@ -24,6 +24,7 @@ import {
   FlaskConical,
   CheckCircle2,
   AlertCircle,
+  AlertTriangle,
   Eye,
   Edit3,
   Users,
@@ -166,14 +167,15 @@ export default function Generator() {
 
     const items = raw.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
     const newItems = [];
+    const isSingleInput = items.length === 1;
 
     for (const item of items) {
       const angleMatch = item.match(/^(.*?)\s*<([^\s>]+@[^\s>]+\.[^\s>]+)>$/);
-      let name = customNameInput.trim();
       let email = '';
+      let name = '';
 
       if (angleMatch) {
-        name = angleMatch[1].trim() || name;
+        name = angleMatch[1].trim();
         email = angleMatch[2].trim().toLowerCase();
       } else {
         email = item.toLowerCase();
@@ -184,6 +186,12 @@ export default function Generator() {
         continue;
       }
 
+      // If single item, use customNameInput if provided
+      if (isSingleInput && customNameInput.trim()) {
+        name = customNameInput.trim();
+      }
+
+      // If name still empty or multiple batch items without embedded names, derive individual name from email prefix
       if (!name) {
         const prefix = email.split('@')[0].replace(/[._-]/g, ' ');
         name = prefix.replace(/\b\w/g, c => c.toUpperCase());
@@ -202,8 +210,12 @@ export default function Generator() {
       });
       setCustomEmailInput('');
       setCustomNameInput('');
-      success(`Added ${newItems.length} recipient${newItems.length > 1 ? 's' : ''}.`);
+      success(`Added ${newItems.length} recipient${newItems.length > 1 ? 's with individual names' : ''}.`);
     }
+  };
+
+  const handleUpdateCustomRecipientName = (idx, newName) => {
+    setCustomRecipients(prev => prev.map((cr, i) => i === idx ? { ...cr, name: newName } : cr));
   };
 
   const handleRemoveCustomRecipient = (idx) => {
@@ -769,6 +781,36 @@ export default function Generator() {
                 onChange={e => setBody(e.target.value)}
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/60 text-slate-900 dark:text-white font-sans text-xs leading-relaxed focus:ring-2 focus:ring-indigo-500 focus:outline-none"
               />
+
+              {/* Dynamic Personalization Indicator */}
+              {Boolean(body) && (
+                <div className="pt-1">
+                  {body.includes('{{name}}') || body.includes('{{first_name}}') ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/80 text-[11px] text-emerald-800 dark:text-emerald-300 font-medium">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>
+                        Dynamic Personalization Active: Each recipient receives an email with their own name automatically substituted into <code className="px-1 rounded bg-white dark:bg-emerald-900/60 font-mono text-[10px] font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700">{`{{name}}`}</code>.
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-[11px] text-amber-900 dark:text-amber-200">
+                      <div className="flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <span>
+                          No <code className="font-mono font-bold text-[10px] bg-amber-100 dark:bg-amber-900 px-1 py-0.5 rounded">{`{{name}}`}</code> tag found. All recipients will receive the identical text without personalized names.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleInsertVariable('{{name}}')}
+                        className="px-2.5 py-1 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-semibold text-[10px] shrink-0 shadow-sm transition-colors cursor-pointer"
+                      >
+                        + Insert {'{{name}}'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Variable Pills Component */}
@@ -1119,54 +1161,62 @@ export default function Generator() {
 
             {/* Live Recipient Info Bar (Replaces old manual dropdown) */}
             {currentRecipients.length > 0 ? (
-              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
-                  <span className="text-slate-500 dark:text-slate-400 shrink-0 font-medium text-[11px]">
-                    Outgoing To:
-                  </span>
-                  <span className="font-semibold text-indigo-950 dark:text-indigo-200 truncate">
-                    {currentPreviewContact.name}
-                  </span>
-                  {(currentPreviewContact.email || currentPreviewContact.phone) && (
-                    <span className="text-slate-400 dark:text-slate-500 text-[11px] truncate hidden sm:inline font-mono">
-                      &lt;{currentPreviewContact.email || currentPreviewContact.phone}&gt;
+              <div className="space-y-1">
+                <div className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                    <span className="text-slate-500 dark:text-slate-400 shrink-0 font-medium text-[11px]">
+                      Outgoing To:
                     </span>
+                    <span className="font-semibold text-indigo-950 dark:text-indigo-200 truncate">
+                      {currentPreviewContact.name}
+                    </span>
+                    {(currentPreviewContact.email || currentPreviewContact.phone) && (
+                      <span className="text-slate-400 dark:text-slate-500 text-[11px] truncate hidden sm:inline font-mono">
+                        &lt;{currentPreviewContact.email || currentPreviewContact.phone}&gt;
+                      </span>
+                    )}
+                  </div>
+
+                  {currentRecipients.length > 1 && (
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-semibold">
+                        {(previewContactIndex % currentRecipients.length) + 1} of {currentRecipients.length}
+                      </span>
+                      <div className="flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewContactIndex(prev =>
+                              prev > 0 ? prev - 1 : currentRecipients.length - 1
+                            )
+                          }
+                          className="p-1 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
+                          title="Previous recipient"
+                        >
+                          <ChevronLeft className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPreviewContactIndex(prev =>
+                              (prev + 1) % currentRecipients.length
+                            )
+                          }
+                          className="p-1 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
+                          title="Next recipient"
+                        >
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
                 {currentRecipients.length > 1 && (
-                  <div className="flex items-center gap-1 shrink-0 ml-2">
-                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-semibold">
-                      {(previewContactIndex % currentRecipients.length) + 1} of {currentRecipients.length}
-                    </span>
-                    <div className="flex items-center gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPreviewContactIndex(prev =>
-                            prev > 0 ? prev - 1 : currentRecipients.length - 1
-                          )
-                        }
-                        className="p-1 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
-                        title="Previous recipient"
-                      >
-                        <ChevronLeft className="w-3.5 h-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          setPreviewContactIndex(prev =>
-                            (prev + 1) % currentRecipients.length
-                          )
-                        }
-                        className="p-1 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
-                        title="Next recipient"
-                      >
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
+                  <p className="text-[10.5px] text-slate-500 dark:text-slate-400 px-2 flex items-center gap-1">
+                    <span className="text-indigo-500">ℹ️</span>
+                    <span>Previewing for <strong>{currentPreviewContact.name}</strong>. Each recipient will receive their own separate email with their own name.</span>
+                  </p>
                 )}
               </div>
             ) : (
@@ -1255,6 +1305,7 @@ export default function Generator() {
         emailProvider={emailProvider}
         isEmailConfigured={isEmailConfigured}
         isSmtpConfigured={isEmailConfigured}
+        hasNamePlaceholder={Boolean(body.includes('{{name}}') || body.includes('{{first_name}}'))}
         onSwitchToDemo={async () => {
           await handleToggleDemoMode();
         }}
