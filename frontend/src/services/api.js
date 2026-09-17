@@ -829,8 +829,8 @@ export const api = {
           const deliveryList = Array.isArray(res.deliveryResults) && res.deliveryResults.length > 0
             ? res.deliveryResults
             : [{
-                contact_name: data.customRecipients?.[0]?.name || 'Recipient',
-                target: data.customRecipients?.[0]?.email || 'mukeshvarma95117@gmail.com',
+                contact_name: data.recipients?.[0]?.name || data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Recipient'),
+                target: data.recipients?.[0]?.email || data.customRecipients?.[0]?.email || 'N/A',
                 renderedSubject: data.subject || '',
                 renderedBody: data.body || '',
                 status: isDemo ? 'Demo Sent' : 'Sent',
@@ -879,8 +879,8 @@ export const api = {
       const deliveryList = Array.isArray(serverlessRes.deliveryResults) && serverlessRes.deliveryResults.length > 0
         ? serverlessRes.deliveryResults
         : [{
-            contact_name: data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Mukesh Varma'),
-            target: data.customRecipients?.[0]?.email || 'mukeshvarma95117@gmail.com',
+            contact_name: data.recipients?.[0]?.name || data.customRecipients?.[0]?.name || (data.recipientIds?.length > 1 ? `${data.recipientIds.length} Recipients` : 'Recipient'),
+            target: data.recipients?.[0]?.email || data.customRecipients?.[0]?.email || 'N/A',
             renderedSubject: data.subject || '',
             renderedBody: data.body || '',
             status: isDemo ? 'Demo Sent' : 'Sent',
@@ -996,9 +996,19 @@ export const api = {
     if (isSupabaseConfigured) {
       try {
         const recipientsToStore = (Array.isArray(data.recipients) && data.recipients.length > 0)
-          ? data.recipients
+          ? data.recipients.map(r => ({
+              id: r.id !== undefined ? r.id : null,
+              name: r.name || (r.email ? r.email.split('@')[0] : 'Recipient'),
+              email: r.email || null,
+              phone: r.phone || null,
+              custom_fields: r.custom_fields || {}
+            }))
           : (Array.isArray(data.customRecipients) && data.customRecipients.length > 0)
-          ? data.customRecipients
+          ? data.customRecipients.map(cr => ({
+              id: null,
+              name: cr.name || (cr.email ? cr.email.split('@')[0] : 'Recipient'),
+              email: cr.email || null
+            }))
           : (data.recipientIds || []);
 
         const { data: sched, error } = await supabase.from('scheduled_messages').insert([{

@@ -6,12 +6,18 @@ export default function ScheduleModal({
   isOpen,
   onClose,
   onSchedule,
+  recipients = [],
   recipientCount = 0,
   channel = 'email',
   isScheduling = false
 }) {
   const systemTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata';
   const [timezone, setTimezone] = useState(systemTz);
+
+  const actualRecipientList = Array.isArray(recipients) ? recipients : [];
+  const actualRecipientCount = actualRecipientList.length > 0 ? actualRecipientList.length : recipientCount;
+  const primaryRecipient = actualRecipientList[0] || null;
+  const otherCount = actualRecipientCount > 1 ? actualRecipientCount - 1 : 0;
 
   // Helper to format date as YYYY-MM-DD
   const formatDateStr = (d) => {
@@ -118,7 +124,7 @@ export default function ScheduleModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (isPast || !utcDate) return;
+    if (isPast || !utcDate || actualRecipientCount === 0) return;
     onSchedule({
       scheduledDateTime: scheduledDateTimeStr,
       utcScheduledTime: utcDate.toISOString(),
@@ -149,17 +155,43 @@ export default function ScheduleModal({
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4 text-xs">
           {/* Dispatch Target Banner */}
-          <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 text-slate-700 dark:text-slate-200 flex items-center justify-between">
-            <div>
-              <span>Scheduled dispatch to </span>
-              <strong className="text-indigo-600 dark:text-indigo-400">{recipientCount} recipient{recipientCount !== 1 ? 's' : ''}</strong>
-              <span> across </span>
-              <strong className="capitalize">{channel}</strong>.
+          {actualRecipientCount === 0 ? (
+            <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900/50 text-rose-800 dark:text-rose-200 flex items-center gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+              <div>
+                <strong className="block text-rose-900 dark:text-rose-100">No recipient selected</strong>
+                <span>Please select a recipient from the composer before scheduling.</span>
+              </div>
             </div>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300">
-              Auto-Queue
-            </span>
-          </div>
+          ) : (
+            <div className="p-3.5 rounded-xl bg-indigo-50/70 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50 text-slate-700 dark:text-slate-200 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-700 text-white font-bold flex items-center justify-center text-xs shadow-sm shrink-0">
+                  {primaryRecipient?.name ? primaryRecipient.name.charAt(0).toUpperCase() : 'R'}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-bold text-slate-900 dark:text-white truncate">
+                      {primaryRecipient?.name || primaryRecipient?.email || `${actualRecipientCount} Recipient(s)`}
+                    </span>
+                    {otherCount > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-indigo-100 dark:bg-indigo-900/80 text-indigo-700 dark:text-indigo-300 text-[10px] font-semibold">
+                        +{otherCount} more
+                      </span>
+                    )}
+                  </div>
+                  {primaryRecipient?.email && (
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block font-mono truncate">
+                      {primaryRecipient.email}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 capitalize shrink-0">
+                {channel}
+              </span>
+            </div>
+          )}
 
           {/* Quick Schedule Shortcuts */}
           <div className="space-y-1.5">
@@ -376,7 +408,7 @@ export default function ScheduleModal({
             </button>
             <button
               type="submit"
-              disabled={isScheduling || isPast}
+              disabled={isScheduling || isPast || actualRecipientCount === 0}
               className="inline-flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
             >
               {isScheduling ? 'Scheduling...' : 'Set Scheduled Send'}

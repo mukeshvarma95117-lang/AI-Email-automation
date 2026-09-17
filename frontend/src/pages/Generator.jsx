@@ -1412,8 +1412,14 @@ export default function Generator() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowScheduleModal(true)}
-                  disabled={!body.trim()}
+                  onClick={() => {
+                    if (currentRecipients.length === 0) {
+                      error('Please choose at least one recipient before scheduling.');
+                      return;
+                    }
+                    setShowScheduleModal(true);
+                  }}
+                  disabled={!body.trim() || currentRecipients.length === 0}
                   className="py-2.5 px-3 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-indigo-50 dark:bg-indigo-950/60 hover:bg-indigo-100 text-indigo-700 dark:text-indigo-300 font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50 btn-lift"
                 >
                   <Clock className="w-3.5 h-3.5" />
@@ -1463,6 +1469,7 @@ export default function Generator() {
         isOpen={showScheduleModal}
         onClose={() => setShowScheduleModal(false)}
         onSchedule={handleScheduleConfirm}
+        recipients={currentRecipients}
         recipientCount={currentRecipients.length}
         channel={channel}
         isScheduling={isSending}

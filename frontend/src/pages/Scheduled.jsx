@@ -2,14 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { formatScheduledDisplay } from '../utils/dateUtils';
-import { Clock, Ban, Calendar, Globe, Mail, MessageSquare, Smartphone, CheckCircle, AlertCircle, RefreshCw, Trash2, Filter, Send, Play } from 'lucide-react';
+import { 
+  Clock, Ban, Calendar, Globe, Mail, MessageSquare, Smartphone, 
+  CheckCircle, AlertCircle, RefreshCw, Trash2, Filter, Send, Play, 
+  Eye, User, Sparkles, X, ChevronRight, Check
+} from 'lucide-react';
 
 export default function Scheduled() {
   const [scheduledList, setScheduledList] = useState([]);
+  const [contacts, setContacts] = useState([]);
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(true);
   const [sendingId, setSendingId] = useState(null);
   const [processingQueue, setProcessingQueue] = useState(false);
+  const [viewingItem, setViewingItem] = useState(null);
+  const [showRawTemplate, setShowRawTemplate] = useState(false);
   const { success, error, info } = useToast();
 
   const loadScheduled = async (silent = false) => {
@@ -20,8 +27,15 @@ export default function Scheduled() {
         await api.processScheduledQueue();
       } catch (e) {}
 
-      const res = await api.getScheduledMessages();
+      const [res, contactsRes] = await Promise.all([
+        api.getScheduledMessages(),
+        api.getContacts({ limit: 100 }).catch(() => ({ contacts: [] }))
+      ]);
+
       setScheduledList(res.scheduled || []);
+      if (Array.isArray(contactsRes?.contacts)) {
+        setContacts(contactsRes.contacts);
+      }
     } catch (err) {
       if (!silent) error(err.message || 'Failed to load scheduled messages.');
     } finally {
@@ -108,6 +122,57 @@ export default function Scheduled() {
   const scheduledCount = scheduledList.filter(s => s.status === 'scheduled').length;
   const cancelledCount = scheduledList.filter(s => s.status === 'cancelled').length;
   const completedCount = scheduledList.filter(s => s.status === 'completed').length;
+
+  const resolveItemRecipients = (item, contactsList) => {
+    let raw = [];
+    try {
+      raw = JSON.parse(item.recipients_json || '[]');
+    } catch (e) {
+      raw = [];
+    }
+    if (!Array.isArray(raw)) raw = [raw];
+
+    return raw.map((entry, idx) => {
+      if (typeof entry === 'object' && entry !== null) {
+        return {
+          id: entry.id !== undefined ? entry.id : -(idx + 1),
+          name: entry.name || (entry.email ? entry.email.split('@')[0] : 'Recipient'),
+          email: entry.email || '',
+          phone: entry.phone || ''
+        };
+      }
+      // Look up in contactsList by numeric or string ID
+      const matched = contactsList.find(c => String(c.id) === String(entry));
+      if (matched) {
+        return {
+          id: matched.id,
+          name: matched.name || (matched.email ? matched.email.split('@')[0] : 'Recipient'),
+          email: matched.email || '',
+          phone: matched.phone || ''
+        };
+      }
+      // If string looks like email
+      if (typeof entry === 'string' && entry.includes('@')) {
+        const prefix = entry.split('@')[0].replace(/[._-]/g, ' ');
+        return {
+          id: null,
+          name: prefix.replace(/\b\w/g, c => c.toUpperCase()),
+          email: entry,
+          phone: ''
+        };
+      }
+      return { id: entry, name: `Contact #${entry}`, email: '', phone: '' };
+    });
+  };
+
+  const getRenderedPreview = (text, primaryRecipient) => {
+    if (!text) return '';
+    const name = primaryRecipient?.name || 'Recipient';
+    return text
+      .replace(/\{\{\s*name\s*\}\}/gi, name)
+      .replace(/\{\{\s*first_name\s*\}\}/gi, name)
+      .replace(/\{\{\s*firstname\s*\}\}/gi, name);
+  };
 
   const filteredList = scheduledList.filter(item => {
     if (filterStatus === 'all') return true;
@@ -228,17 +293,11 @@ export default function Scheduled() {
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {filteredList.map(item => {
-                let recipientCount = 0;
-                let recipientObjects = [];
-                try {
-                  const arr = JSON.parse(item.recipients_json || '[]');
-                  recipientCount = arr.length;
-                  if (arr.length > 0 && typeof arr[0] === 'object' && arr[0] !== null) {
-                    recipientObjects = arr;
-                  }
-                } catch (e) {
-                  recipientCount = 0;
-                }
+                const recipients = resolveItemRecipients(item, contacts);
+                const primaryRecipient = recipients[0] || null;
+                const otherRecipientsCount = recipients.length > 1 ? recipients.length - 1 : 0;
+                const renderedSubject = getRenderedPreview(item.subject, primaryRecipient);
+                const renderedBody = getRenderedPreview(item.body, primaryRecipient);
 
                 return (
                   <tr key={item.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
@@ -256,12 +315,18 @@ export default function Scheduled() {
                     <td className="px-6 py-4 max-w-sm">
                       {item.subject && (
                         <p className="font-bold text-slate-900 dark:text-white truncate">
-                          {item.subject}
+                          {renderedSubject}
                         </p>
                       )}
                       <p className="text-slate-500 dark:text-slate-400 text-[11px] truncate">
-                        {item.body}
+                        {renderedBody}
                       </p>
+                      {primaryRecipient?.name && (
+                        <div className="flex items-center gap-1 text-[10px] text-emerald-600 dark:text-emerald-400 font-medium mt-0.5">
+                          <Check className="w-3 h-3 shrink-0" />
+                          <span>Personalized for <strong>{primaryRecipient.name}</strong></span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Scheduled Time */}
@@ -278,18 +343,28 @@ export default function Scheduled() {
 
                     {/* Recipients */}
                     <td className="px-6 py-4">
-                      {recipientObjects.length > 0 ? (
-                        <div>
-                          <p className="font-bold text-slate-900 dark:text-white truncate max-w-[150px]">
-                            {recipientObjects[0].name || recipientObjects[0].email}
-                          </p>
-                          <p className="text-[10px] text-slate-400 truncate max-w-[150px]">
-                            {recipientObjects.length > 1 ? `+${recipientObjects.length - 1} other recipient${recipientObjects.length > 2 ? 's' : ''}` : recipientObjects[0].email}
-                          </p>
+                      {primaryRecipient ? (
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300 font-bold flex items-center justify-center text-xs shrink-0 shadow-xs">
+                            {primaryRecipient.name ? primaryRecipient.name.charAt(0).toUpperCase() : 'R'}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-bold text-slate-900 dark:text-white truncate max-w-[150px]">
+                              {primaryRecipient.name}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-mono truncate max-w-[150px]">
+                              {primaryRecipient.email || primaryRecipient.phone || 'N/A'}
+                            </p>
+                            {otherRecipientsCount > 0 && (
+                              <span className="inline-block text-[10px] font-semibold text-indigo-600 dark:text-indigo-400 mt-0.5">
+                                +{otherRecipientsCount} other recipient{otherRecipientsCount > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       ) : (
-                        <span className="font-bold text-slate-900 dark:text-white">
-                          {recipientCount} recipient{recipientCount !== 1 ? 's' : ''}
+                        <span className="font-medium text-slate-400 text-xs">
+                          No recipients
                         </span>
                       )}
                     </td>
@@ -326,6 +401,19 @@ export default function Scheduled() {
                     {/* Action Buttons */}
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setViewingItem(item);
+                            setShowRawTemplate(false);
+                          }}
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-semibold transition-colors cursor-pointer btn-lift"
+                          title="View Message Preview & Personalized Details"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>Preview</span>
+                        </button>
+
                         {item.status === 'scheduled' ? (
                           <>
                             <button
@@ -386,6 +474,184 @@ export default function Scheduled() {
           </table>
         </div>
       </div>
+
+      {/* Detailed Message Inspection Modal */}
+      {viewingItem && (() => {
+        const itemRecipients = resolveItemRecipients(viewingItem, contacts);
+        const itemPrimary = itemRecipients[0] || null;
+        const personalizedSubject = getRenderedPreview(viewingItem.subject, itemPrimary);
+        const personalizedBody = getRenderedPreview(viewingItem.body, itemPrimary);
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div 
+              className="w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shadow-xs">
+                    {viewingItem.channel === 'email' && <Mail className="w-5 h-5" />}
+                    {viewingItem.channel === 'whatsapp' && <MessageSquare className="w-5 h-5" />}
+                    {viewingItem.channel === 'sms' && <Smartphone className="w-5 h-5" />}
+                  </div>
+                  <div>
+                    <h2 className="font-bold text-slate-900 dark:text-white text-sm">
+                      Scheduled Message Preview & Details
+                    </h2>
+                    <span className="text-[11px] text-slate-400 capitalize">
+                      {viewingItem.channel} Channel • {viewingItem.status}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setViewingItem(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto text-xs">
+                {/* Recipient Card */}
+                <div className="p-4 rounded-2xl bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/50">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <span className="font-bold uppercase tracking-wider text-[10px] text-indigo-700 dark:text-indigo-300 flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5" /> Target Recipient
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 dark:bg-indigo-900/80 text-indigo-800 dark:text-indigo-200 font-semibold text-[10px]">
+                      {itemRecipients.length} Recipient{itemRecipients.length !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {itemRecipients.map((r, i) => (
+                      <div key={i} className="flex items-center justify-between p-2 rounded-xl bg-white dark:bg-slate-900 border border-indigo-100 dark:border-indigo-900/60">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">
+                            {r.name ? r.name.charAt(0).toUpperCase() : 'R'}
+                          </div>
+                          <div>
+                            <span className="font-bold text-slate-900 dark:text-white">{r.name}</span>
+                            <span className="text-[11px] text-slate-400 block font-mono">{r.email || r.phone || 'N/A'}</span>
+                          </div>
+                        </div>
+                        {i === 0 && (
+                          <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md border border-emerald-200 dark:border-emerald-800">
+                            Primary
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Dispatch Timing Info */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Scheduled Time</span>
+                    <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white">
+                      <Calendar className="w-4 h-4 text-amber-500" />
+                      <span>{formatScheduledDisplay(viewingItem.scheduled_time, viewingItem.timezone)}</span>
+                    </div>
+                  </div>
+
+                  <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Target Timezone</span>
+                    <div className="flex items-center gap-1.5 font-bold text-slate-900 dark:text-white">
+                      <Globe className="w-4 h-4 text-indigo-500" />
+                      <span>{viewingItem.timezone || 'Local Time'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Subject Preview */}
+                {viewingItem.subject && (
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] uppercase font-bold text-slate-400 block">Email Subject</span>
+                    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 font-bold text-slate-900 dark:text-white">
+                      {showRawTemplate ? viewingItem.subject : personalizedSubject}
+                    </div>
+                  </div>
+                )}
+
+                {/* Message Body Preview */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Message Body</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowRawTemplate(!showRawTemplate)}
+                      className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
+                    >
+                      {showRawTemplate ? 'Show Personalized View' : 'Show Raw Template with {{tags}}'}
+                    </button>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-sans whitespace-pre-wrap leading-relaxed">
+                    {showRawTemplate ? viewingItem.body : personalizedBody}
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-800/50 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setViewingItem(null)}
+                  className="px-4 py-2 rounded-xl font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer text-xs"
+                >
+                  Close
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {viewingItem.status === 'scheduled' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const id = viewingItem.id;
+                          setViewingItem(null);
+                          handleSendNow(id);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl font-semibold bg-indigo-600 hover:bg-indigo-700 text-white shadow-md shadow-indigo-600/20 text-xs transition-all cursor-pointer"
+                      >
+                        <Send className="w-3.5 h-3.5" />
+                        <span>Send Now</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const id = viewingItem.id;
+                          setViewingItem(null);
+                          handleCancel(id);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 text-xs transition-colors cursor-pointer"
+                      >
+                        <Ban className="w-3.5 h-3.5" />
+                        <span>Cancel</span>
+                      </button>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const id = viewingItem.id;
+                      setViewingItem(null);
+                      handleDelete(id);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

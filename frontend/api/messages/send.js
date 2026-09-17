@@ -116,13 +116,28 @@ export default async function handler(req, res) {
       targetContacts = customRecipients;
     }
 
+    // If only recipientIds provided, resolve from Supabase
+    if (targetContacts.length === 0 && Array.isArray(req.body?.recipientIds) && req.body.recipientIds.length > 0) {
+      const SUPABASE_URL = process.env.SUPABASE_URL || 'https://joqherfotksjlpyztcdc.supabase.co';
+      const SUPABASE_ANON = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvcWhlcmZvdGtzamxweXp0Y2RjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MzMzMDgsImV4cCI6MjEwNDQwOTMwOH0.6CNA9387QAW47khchSbyOGocMUHu4_YMIhwigv432mA';
+      try {
+        const idList = req.body.recipientIds.map(encodeURIComponent).join(',');
+        const sRes = await fetch(`${SUPABASE_URL}/rest/v1/contacts?id=in.(${idList})`, {
+          headers: { apikey: SUPABASE_ANON, Authorization: `Bearer ${SUPABASE_ANON}` }
+        });
+        if (sRes.ok) {
+          const fetched = await sRes.json();
+          if (Array.isArray(fetched) && fetched.length > 0) {
+            targetContacts = fetched;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to resolve recipientIds from Supabase in serverless handler:', e);
+      }
+    }
+
     if (targetContacts.length === 0) {
-      targetContacts = [{
-        name: 'Mukesh Varma',
-        email: 'mukeshvarma95117@gmail.com',
-        company: 'SmartSend AI',
-        event: 'AI Workshop'
-      }];
+      return res.status(400).json({ error: 'No recipients specified. Please select a contact or enter a recipient email address.' });
     }
 
     // DEMO MODE
