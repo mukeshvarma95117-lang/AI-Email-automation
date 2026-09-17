@@ -388,17 +388,55 @@ export default function Generator() {
     }
   };
 
+  // Extract dynamic campaign variables from the active prompt
+  const activePromptGlobalVars = (() => {
+    const vars = {};
+    const lower = prompt.toLowerCase();
+
+    // Time (e.g. 11 AM, 11:00 AM, 11am, 2:30 PM, 9 PM)
+    const timeMatch = prompt.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i);
+    if (timeMatch) vars.time = timeMatch[1].toUpperCase();
+
+    // Date
+    const dateMatch = prompt.match(/\b(tomorrow|today|tonight|this\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
+    if (dateMatch) vars.date = dateMatch[1];
+    else if (lower.includes('tomorrow')) vars.date = 'tomorrow';
+    else if (lower.includes('today')) vars.date = 'today';
+
+    // Event
+    const aboutMatch = prompt.match(/\babout\s+(?:tomorrow['’]s\s+|today['’]s\s+)?([^.!?\n]+?)(?:\s+at\s+\d|\s+on\s+|\s+in\s+|\.|\?|!|$)/i);
+    if (aboutMatch && aboutMatch[1].trim().length > 2 && aboutMatch[1].trim().length < 50) {
+      vars.event = aboutMatch[1].trim().replace(/\b\w/g, c => c.toUpperCase());
+    } else if (lower.includes('workshop')) vars.event = 'Hands-On AI Workshop';
+    else if (lower.includes('hackathon')) vars.event = 'Inter-College Hackathon';
+    else if (lower.includes('interview')) vars.event = 'Technical Round Interview';
+    else if (lower.includes('exam') || lower.includes('test')) vars.event = 'Mid-Term Examination';
+
+    return vars;
+  })();
+
   // Live variable substituted preview text
-  const renderedSubject = substituteVariables(subject, currentPreviewContact);
-  const renderedBody = substituteVariables(body, currentPreviewContact);
+  const renderedSubject = substituteVariables(subject, currentPreviewContact, activePromptGlobalVars);
+  const renderedBody = substituteVariables(body, currentPreviewContact, activePromptGlobalVars);
 
   // Check if description prompt has been modified since last generation
   const isPromptModified = Boolean(body) && prompt.trim().length > 0 && prompt.trim() !== lastGeneratedPrompt.trim();
 
+  // Auto-regenerate when prompt changes (debounced by 800ms) when user is not manually editing copy
+  useEffect(() => {
+    if (!body || isEditing || !prompt.trim() || prompt.trim() === lastGeneratedPrompt.trim()) {
+      return;
+    }
+    const timer = setTimeout(() => {
+      handleGenerate();
+    }, 800);
+    return () => clearTimeout(timer);
+  }, [prompt, tone, language, channel, messageType, length, body, isEditing, lastGeneratedPrompt]);
+
   // Safety checks
   const missingTargets = currentRecipients.filter(c => channel === 'email' ? !c.email : !c.phone).length;
   const detectedVariables = extractVariables(`${subject} ${body}`);
-  const sampleResolved = substituteVariables(body, currentPreviewContact);
+  const sampleResolved = substituteVariables(body, currentPreviewContact, activePromptGlobalVars);
   const unresolvedVars = extractVariables(sampleResolved);
 
   // Dispatch Immediately
@@ -419,7 +457,8 @@ export default function Generator() {
         groupId: recipientMode === 'group' ? (selectedGroupId && selectedGroupId !== 'all' ? Number(selectedGroupId) : 'all') : null,
         recipientIds: recipientMode === 'individual' ? selectedContactIds : (isAllGroup ? contacts.map(c => c.id) : null),
         sendToAll: isAllGroup,
-        customRecipients: recipientMode === 'custom' ? customRecipients : null
+        customRecipients: recipientMode === 'custom' ? customRecipients : null,
+        globalVars: activePromptGlobalVars
       };
 
       const res = await api.sendMessage(payload);
@@ -468,7 +507,8 @@ export default function Generator() {
         sendToAll: isAllGroup,
         scheduled_time: utcScheduledTime || scheduledDateTime,
         raw_scheduled_time: scheduledDateTime,
-        timezone
+        timezone,
+        globalVars: activePromptGlobalVars
       };
 
       await api.scheduleMessage(payload);

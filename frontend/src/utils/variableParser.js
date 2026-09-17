@@ -25,6 +25,7 @@ export function substituteVariables(text, contact = {}, globalVars = {}) {
   const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
 
   const merged = {
+    ...customFields,
     ...contact,
     name: fullName,
     first_name: contact.first_name || firstName,
@@ -34,8 +35,7 @@ export function substituteVariables(text, contact = {}, globalVars = {}) {
     email: contact.email || '',
     phone: contact.phone || '',
     group: contact.group_name || contact.group || '',
-    ...globalVars,
-    ...customFields
+    ...globalVars
   };
 
   return text.replace(/\{\{([^}]+)\}\}/g, (match, varName) => {

@@ -37,6 +37,7 @@ export function resolveVariables(text, contact = {}, globalVars = {}) {
   const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
 
   const mergedVars = {
+    ...customFields,
     ...contact,
     name: fullName,
     first_name: contact.first_name || firstName,
@@ -46,8 +47,7 @@ export function resolveVariables(text, contact = {}, globalVars = {}) {
     email: contact.email || '',
     phone: contact.phone || '',
     group: contact.group_name || contact.group || '',
-    ...globalVars,
-    ...customFields
+    ...globalVars
   };
 
   const regex = /\{\{([^}]+)\}\}/g;
