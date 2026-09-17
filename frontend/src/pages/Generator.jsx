@@ -28,6 +28,8 @@ import {
   Edit3,
   Users,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   Info,
   Plus,
   Trash2,
@@ -193,7 +195,11 @@ export default function Generator() {
     }
 
     if (newItems.length > 0) {
-      setCustomRecipients(prev => [...prev, ...newItems]);
+      setCustomRecipients(prev => {
+        const next = [...prev, ...newItems];
+        setPreviewContactIndex(next.length - 1);
+        return next;
+      });
       setCustomEmailInput('');
       setCustomNameInput('');
       success(`Added ${newItems.length} recipient${newItems.length > 1 ? 's' : ''}.`);
@@ -201,7 +207,11 @@ export default function Generator() {
   };
 
   const handleRemoveCustomRecipient = (idx) => {
-    setCustomRecipients(prev => prev.filter((_, i) => i !== idx));
+    setCustomRecipients(prev => {
+      const next = prev.filter((_, i) => i !== idx);
+      setPreviewContactIndex(0);
+      return next;
+    });
   };
 
   const handleAddMyEmail = () => {
@@ -215,7 +225,11 @@ export default function Generator() {
     }
     const prefix = userSmtpEmail.split('@')[0].replace(/[._-]/g, ' ');
     const name = prefix.replace(/\b\w/g, c => c.toUpperCase());
-    setCustomRecipients(prev => [...prev, { name, email: userSmtpEmail }]);
+    setCustomRecipients(prev => {
+      const next = [...prev, { name, email: userSmtpEmail }];
+      setPreviewContactIndex(next.length - 1);
+      return next;
+    });
     success(`Added your email: ${userSmtpEmail}`);
   };
 
@@ -314,37 +328,6 @@ export default function Generator() {
     }
   };
 
-  // Resolve current preview contact
-  const currentPreviewContact = recipientMode === 'custom' && customRecipients.length > 0
-    ? {
-        name: customRecipients[previewContactIndex % customRecipients.length]?.name || 'Direct Recipient',
-        email: customRecipients[previewContactIndex % customRecipients.length]?.email || 'recipient@example.com',
-        phone: '+1 555-0192',
-        group_name: 'Direct Recipient',
-        custom_fields: {
-          event: "Tomorrow's Session",
-          date: 'tomorrow, Sept 8',
-          time: '10:00 AM',
-          location: 'Main Hall'
-        }
-      }
-    : contacts[previewContactIndex] || {
-        name: 'Rahul Sharma',
-        email: 'rahul.sharma@example.edu',
-        phone: '+1 555-0192',
-        group_name: 'AI Workshop Students',
-        custom_fields: {
-          event: "Tomorrow's Hands-On AI Workshop",
-          date: 'tomorrow, Sept 8',
-          time: '10:00 AM',
-          location: 'Lab 3B'
-        }
-      };
-
-  // Live variable substituted preview text
-  const renderedSubject = substituteVariables(subject, currentPreviewContact);
-  const renderedBody = substituteVariables(body, currentPreviewContact);
-
   // Filter contacts by search query
   const filteredContacts = contacts.filter(c => {
     if (!contactSearch.trim()) return true;
@@ -352,18 +335,44 @@ export default function Generator() {
     return (c.name || '').toLowerCase().includes(q) || (c.email || '').toLowerCase().includes(q);
   });
 
-  // Compute recipient list
+  // Compute recipient list based on active recipient mode
   const currentRecipients = recipientMode === 'group'
     ? contacts.filter(c => selectedGroupId ? String(c.group_id) === String(selectedGroupId) : true)
     : recipientMode === 'individual'
     ? contacts.filter(c => selectedContactIds.includes(c.id))
     : customRecipients.map((cr, idx) => ({
         id: -(idx + 1),
-        name: cr.name,
+        name: cr.name || 'Direct Recipient',
         email: cr.email,
         phone: null,
         custom_fields: {}
       }));
+
+  // Resolve active recipient to preview in the live channel simulator
+  const activeRecipient = currentRecipients.length > 0
+    ? currentRecipients[previewContactIndex % currentRecipients.length]
+    : null;
+
+  const currentPreviewContact = activeRecipient || {
+    name: recipientMode === 'individual' && selectedContactIds.length === 0
+      ? 'No Recipient Picked'
+      : (contacts[0]?.name || 'Rahul Sharma'),
+    email: recipientMode === 'individual' && selectedContactIds.length === 0
+      ? 'pick-contacts-on-left@preview.local'
+      : (contacts[0]?.email || 'rahul.sharma@example.edu'),
+    phone: contacts[0]?.phone || '+1 555-0192',
+    group_name: contacts[0]?.group_name || 'AI Workshop Students',
+    custom_fields: contacts[0]?.custom_fields || {
+      event: "Tomorrow's Hands-On AI Workshop",
+      date: 'tomorrow, Sept 8',
+      time: '10:00 AM',
+      location: 'Lab 3B'
+    }
+  };
+
+  // Live variable substituted preview text
+  const renderedSubject = substituteVariables(subject, currentPreviewContact);
+  const renderedBody = substituteVariables(body, currentPreviewContact);
 
   // Safety checks
   const missingTargets = currentRecipients.filter(c => channel === 'email' ? !c.email : !c.phone).length;
@@ -808,7 +817,10 @@ export default function Generator() {
             <div className="flex flex-wrap gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => setRecipientMode('group')}
+                onClick={() => {
+                  setRecipientMode('group');
+                  setPreviewContactIndex(0);
+                }}
                 className={`px-3 py-1.5 rounded-xl font-medium transition-colors ${
                   recipientMode === 'group'
                     ? 'bg-indigo-600 text-white font-semibold'
@@ -819,7 +831,10 @@ export default function Generator() {
               </button>
               <button
                 type="button"
-                onClick={() => setRecipientMode('individual')}
+                onClick={() => {
+                  setRecipientMode('individual');
+                  setPreviewContactIndex(0);
+                }}
                 className={`px-3 py-1.5 rounded-xl font-medium transition-colors ${
                   recipientMode === 'individual'
                     ? 'bg-indigo-600 text-white font-semibold'
@@ -830,7 +845,10 @@ export default function Generator() {
               </button>
               <button
                 type="button"
-                onClick={() => setRecipientMode('custom')}
+                onClick={() => {
+                  setRecipientMode('custom');
+                  setPreviewContactIndex(0);
+                }}
                 className={`px-3 py-1.5 rounded-xl font-medium transition-colors flex items-center gap-1.5 ${
                   recipientMode === 'custom'
                     ? 'bg-indigo-600 text-white font-semibold'
@@ -848,7 +866,10 @@ export default function Generator() {
                 <label className="font-semibold text-slate-500">Target Cohort</label>
                 <select
                   value={selectedGroupId}
-                  onChange={e => setSelectedGroupId(e.target.value)}
+                  onChange={e => {
+                    setSelectedGroupId(e.target.value);
+                    setPreviewContactIndex(0);
+                  }}
                   className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
                   <option value="">All Contacts ({contacts.length} total)</option>
@@ -871,7 +892,10 @@ export default function Generator() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => setSelectedContactIds(contacts.map(c => c.id))}
+                      onClick={() => {
+                        setSelectedContactIds(contacts.map(c => c.id));
+                        setPreviewContactIndex(0);
+                      }}
                       className="text-indigo-600 dark:text-indigo-400 hover:underline font-semibold cursor-pointer"
                     >
                       Select All ({contacts.length})
@@ -879,7 +903,10 @@ export default function Generator() {
                     <span>|</span>
                     <button
                       type="button"
-                      onClick={() => setSelectedContactIds([])}
+                      onClick={() => {
+                        setSelectedContactIds([]);
+                        setPreviewContactIndex(0);
+                      }}
                       className="text-slate-500 hover:underline cursor-pointer"
                     >
                       Deselect All
@@ -901,20 +928,57 @@ export default function Generator() {
                   ) : (
                     filteredContacts.map(c => {
                       const isChecked = selectedContactIds.includes(c.id);
+                      const isCurrentlyPreviewed = currentRecipients.length > 0 && currentRecipients[previewContactIndex % currentRecipients.length]?.id === c.id;
+
                       return (
-                        <label key={c.id} className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={e => {
-                              if (e.target.checked) setSelectedContactIds(prev => [...prev, c.id]);
-                              else setSelectedContactIds(prev => prev.filter(id => id !== c.id));
-                            }}
-                            className="rounded text-indigo-600 focus:ring-indigo-500"
-                          />
-                          <span className="font-semibold text-slate-800 dark:text-slate-200">{c.name}</span>
-                          <span className="text-slate-400 truncate">({c.email || c.phone})</span>
-                        </label>
+                        <div
+                          key={c.id}
+                          onClick={() => {
+                            if (isChecked) {
+                              const idx = currentRecipients.findIndex(r => r.id === c.id);
+                              if (idx !== -1) setPreviewContactIndex(idx);
+                            }
+                          }}
+                          className={`flex items-center justify-between p-1.5 px-2 rounded-lg cursor-pointer transition-colors ${
+                            isCurrentlyPreviewed
+                              ? 'bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800'
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <label className="flex items-center gap-2 truncate cursor-pointer flex-1 min-w-0" onClick={e => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setSelectedContactIds(prev => {
+                                    const next = [...prev, c.id];
+                                    setPreviewContactIndex(next.length - 1);
+                                    return next;
+                                  });
+                                } else {
+                                  setSelectedContactIds(prev => {
+                                    const next = prev.filter(id => id !== c.id);
+                                    setPreviewContactIndex(0);
+                                    return next;
+                                  });
+                                }
+                              }}
+                              className="rounded text-indigo-600 focus:ring-indigo-500 shrink-0"
+                            />
+                            <span className={`font-semibold truncate ${isCurrentlyPreviewed ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-800 dark:text-slate-200'}`}>
+                              {c.name}
+                            </span>
+                            <span className="text-slate-400 truncate text-[11px]">
+                              ({c.email || c.phone})
+                            </span>
+                          </label>
+                          {isCurrentlyPreviewed && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 shrink-0 pl-1.5">
+                              Previewing
+                            </span>
+                          )}
+                        </div>
                       );
                     })
                   )}
@@ -989,32 +1053,48 @@ export default function Generator() {
                       No direct recipients added yet. Enter an email address above to add.
                     </p>
                   ) : (
-                    customRecipients.map((cr, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-1.5 px-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm"
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
-                            {cr.name.charAt(0).toUpperCase()}
-                          </div>
-                          <span className="font-semibold text-slate-900 dark:text-white truncate text-[11px]">
-                            {cr.name}
-                          </span>
-                          <span className="text-slate-400 font-mono text-[10px] truncate">
-                            &lt;{cr.email}&gt;
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveCustomRecipient(idx)}
-                          className="text-slate-400 hover:text-rose-500 p-1 rounded-md transition-colors"
-                          title="Remove recipient"
+                    customRecipients.map((cr, idx) => {
+                      const isCurrentlyPreviewed = (previewContactIndex % customRecipients.length) === idx;
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setPreviewContactIndex(idx)}
+                          className={`flex items-center justify-between p-1.5 px-2.5 rounded-lg border shadow-sm cursor-pointer transition-colors ${
+                            isCurrentlyPreviewed
+                              ? 'bg-indigo-50 dark:bg-indigo-950/50 border-indigo-200 dark:border-indigo-800'
+                              : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700'
+                          }`}
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    ))
+                          <div className="flex items-center gap-2 truncate">
+                            <div className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-[10px] flex items-center justify-center shrink-0">
+                              {cr.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span className={`font-semibold truncate text-[11px] ${isCurrentlyPreviewed ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-900 dark:text-white'}`}>
+                              {cr.name}
+                            </span>
+                            <span className="text-slate-400 font-mono text-[10px] truncate">
+                              &lt;{cr.email}&gt;
+                            </span>
+                            {isCurrentlyPreviewed && (
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 shrink-0 pl-1.5">
+                                Previewing
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveCustomRecipient(idx);
+                            }}
+                            className="text-slate-400 hover:text-rose-500 p-1 rounded-md transition-colors"
+                            title="Remove recipient"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -1037,24 +1117,64 @@ export default function Generator() {
               </span>
             </div>
 
-            {/* Live Contact Switcher Dropdown */}
-            <div className="p-3 rounded-2xl bg-indigo-50/50 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs space-y-1">
-              <label className="font-semibold text-indigo-900 dark:text-indigo-300 flex items-center justify-between">
-                <span>Preview As Recipient:</span>
-                <span className="text-[10px] text-indigo-500 font-mono">Dynamic Substitution</span>
-              </label>
-              <select
-                value={previewContactIndex}
-                onChange={e => setPreviewContactIndex(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 rounded-lg border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none text-xs"
-              >
-                {contacts.map((c, idx) => (
-                  <option key={c.id} value={idx}>
-                    {c.name} ({c.email || c.phone})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Live Recipient Info Bar (Replaces old manual dropdown) */}
+            {currentRecipients.length > 0 ? (
+              <div className="flex items-center justify-between px-3.5 py-2.5 rounded-2xl bg-indigo-50/70 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+                  <span className="text-slate-500 dark:text-slate-400 shrink-0 font-medium text-[11px]">
+                    Outgoing To:
+                  </span>
+                  <span className="font-semibold text-indigo-950 dark:text-indigo-200 truncate">
+                    {currentPreviewContact.name}
+                  </span>
+                  {(currentPreviewContact.email || currentPreviewContact.phone) && (
+                    <span className="text-slate-400 dark:text-slate-500 text-[11px] truncate hidden sm:inline font-mono">
+                      &lt;{currentPreviewContact.email || currentPreviewContact.phone}&gt;
+                    </span>
+                  )}
+                </div>
+
+                {currentRecipients.length > 1 && (
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-mono font-semibold">
+                      {(previewContactIndex % currentRecipients.length) + 1} of {currentRecipients.length}
+                    </span>
+                    <div className="flex items-center gap-0.5">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreviewContactIndex(prev =>
+                            prev > 0 ? prev - 1 : currentRecipients.length - 1
+                          )
+                        }
+                        className="p-1 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
+                        title="Previous recipient"
+                      >
+                        <ChevronLeft className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setPreviewContactIndex(prev =>
+                            (prev + 1) % currentRecipients.length
+                          )
+                        }
+                        className="p-1 rounded-md hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 transition-colors cursor-pointer"
+                        title="Next recipient"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-amber-50/80 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/40 text-xs text-amber-800 dark:text-amber-300">
+                <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <span>Pick contacts on the left to preview the outgoing mail.</span>
+              </div>
+            )}
 
             {/* Simulators Container */}
             <div className="py-2">
