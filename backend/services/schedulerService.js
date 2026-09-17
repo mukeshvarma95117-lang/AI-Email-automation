@@ -97,14 +97,25 @@ export async function processScheduledJob(job) {
   // Fetch contacts
   let contacts = [];
   if (recipientIds.length > 0) {
-    const placeholders = recipientIds.map(() => '?').join(',');
-    contacts = dbHelper.all(
-      `SELECT c.*, g.name as group_name 
-       FROM contacts c 
-       LEFT JOIN groups_table g ON c.group_id = g.id 
-       WHERE c.id IN (${placeholders})`,
-      recipientIds
-    );
+    if (typeof recipientIds[0] === 'object' && recipientIds[0] !== null) {
+      contacts = recipientIds.map((r, idx) => ({
+        id: r.id !== undefined ? r.id : -(idx + 1),
+        name: r.name || 'Recipient',
+        email: r.email || null,
+        phone: r.phone || null,
+        group_name: r.group_name || '',
+        custom_fields: typeof r.custom_fields === 'object' && r.custom_fields !== null ? r.custom_fields : {}
+      }));
+    } else {
+      const placeholders = recipientIds.map(() => '?').join(',');
+      contacts = dbHelper.all(
+        `SELECT c.*, g.name as group_name 
+         FROM contacts c 
+         LEFT JOIN groups_table g ON c.group_id = g.id 
+         WHERE c.id IN (${placeholders})`,
+        recipientIds
+      );
+    }
   }
 
   let successCount = 0;

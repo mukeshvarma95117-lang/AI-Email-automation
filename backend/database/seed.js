@@ -1,8 +1,50 @@
 import bcrypt from 'bcryptjs';
+import https from 'https';
 import dbHelper from './db.js';
+
+async function syncSupabaseContacts() {
+  const url = 'https://joqherfotksjlpyztcdc.supabase.co/rest/v1/contacts?select=*';
+  const key = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpvcWhlcmZvdGtzamxweXp0Y2RjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg4MzMzMDgsImV4cCI6MjEwNDQwOTMwOH0.6CNA9387QAW47khchSbyOGocMUHu4_YMIhwigv432mA';
+
+  return new Promise((resolve) => {
+    const req = https.get(url, {
+      headers: {
+        'apikey': key,
+        'Authorization': `Bearer ${key}`
+      }
+    }, res => {
+      let raw = '';
+      res.on('data', chunk => raw += chunk);
+      res.on('end', () => {
+        try {
+          const contacts = JSON.parse(raw);
+          if (Array.isArray(contacts)) {
+            for (const c of contacts) {
+              const customFieldsStr = typeof c.custom_fields === 'object' ? JSON.stringify(c.custom_fields) : (c.custom_fields || '{}');
+              const existing = dbHelper.get('SELECT id FROM contacts WHERE id = ? OR email = ?', [c.id, c.email]);
+              if (existing) {
+                dbHelper.run('UPDATE contacts SET name = ?, email = ?, phone = ?, custom_fields = ? WHERE id = ?', [c.name, c.email, c.phone, customFieldsStr, existing.id]);
+              } else {
+                dbHelper.run('INSERT INTO contacts (id, name, email, phone, group_id, custom_fields) VALUES (?, ?, ?, ?, ?, ?)', [c.id, c.name, c.email, c.phone, c.group_id, customFieldsStr]);
+              }
+            }
+            console.log(`Synced ${contacts.length} live contacts from Supabase into SQLite.`);
+          }
+        } catch (e) {}
+        resolve();
+      });
+    });
+    req.on('error', () => resolve());
+    req.setTimeout(5000, () => {
+      req.destroy();
+      resolve();
+    });
+  });
+}
 
 export async function seedDatabase() {
   console.log('Seeding SmartSend AI database...');
+  await syncSupabaseContacts();
 
   // 1. Seed admin user
   const adminEmail = 'admin@smartsendai.online';

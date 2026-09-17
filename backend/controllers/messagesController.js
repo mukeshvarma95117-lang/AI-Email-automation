@@ -24,6 +24,7 @@ export async function sendMessage(req, res) {
       short_version,
       cta,
       channel = 'email',
+      recipients = [],
       recipientIds = [],
       groupId = null,
       sendToAll = false,
@@ -42,7 +43,27 @@ export async function sendMessage(req, res) {
 
     // Resolve target contacts
     let targetContacts = [];
-    if (groupId && groupId !== 'all') {
+
+    // 1. If explicit recipient objects are provided by the client (direct composer selection / Supabase / custom)
+    if (Array.isArray(recipients) && recipients.length > 0) {
+      targetContacts = recipients.map((r, idx) => ({
+        id: r.id !== undefined ? r.id : -(idx + 1),
+        name: r.name || 'Recipient',
+        email: r.email || null,
+        phone: r.phone || null,
+        group_name: r.group_name || '',
+        custom_fields: typeof r.custom_fields === 'object' && r.custom_fields !== null ? r.custom_fields : {}
+      }));
+    } else if (Array.isArray(customRecipients) && customRecipients.length > 0) {
+      targetContacts = customRecipients.map((cr, idx) => ({
+        id: -(idx + 1),
+        name: cr.name || 'Recipient',
+        email: cr.email || null,
+        phone: cr.phone || null,
+        group_name: '',
+        custom_fields: typeof cr.custom_fields === 'object' && cr.custom_fields !== null ? cr.custom_fields : {}
+      }));
+    } else if (groupId && groupId !== 'all') {
       targetContacts = dbHelper.all(
         `SELECT c.*, g.name as group_name 
          FROM contacts c 
@@ -59,14 +80,6 @@ export async function sendMessage(req, res) {
          WHERE c.id IN (${placeholders})`,
         recipientIds
       );
-    } else if (Array.isArray(customRecipients) && customRecipients.length > 0) {
-      targetContacts = customRecipients.map((cr, idx) => ({
-        id: -(idx + 1),
-        name: cr.name || 'Recipient',
-        email: cr.email || null,
-        phone: cr.phone || null,
-        custom_fields: cr.custom_fields || {}
-      }));
     } else if (groupId === 'all' || sendToAll || (!groupId && !recipientIds?.length && !customRecipients?.length)) {
       // Fallback: broadcast to all contacts
       targetContacts = dbHelper.all(
@@ -210,6 +223,7 @@ export async function scheduleMessage(req, res) {
       short_version,
       cta,
       channel = 'email',
+      recipients = [],
       recipientIds = [],
       groupId = null,
       sendToAll = false,
@@ -225,17 +239,30 @@ export async function scheduleMessage(req, res) {
       return res.status(400).json({ error: 'Scheduled time is required.' });
     }
 
-    // Resolve recipient IDs
-    let finalIds = [...(recipientIds || [])];
-    if (groupId && groupId !== 'all') {
-      const groupContacts = dbHelper.all('SELECT id FROM contacts WHERE group_id = ?', [groupId]);
-      finalIds = groupContacts.map(c => c.id);
-    } else if (groupId === 'all' || sendToAll || finalIds.length === 0) {
-      const allContacts = dbHelper.all('SELECT id FROM contacts');
-      finalIds = allContacts.map(c => c.id);
+    // Resolve recipients to store
+    let finalRecipientsData = [];
+    if (Array.isArray(recipients) && recipients.length > 0) {
+      finalRecipientsData = recipients.map((r, idx) => ({
+        id: r.id !== undefined ? r.id : -(idx + 1),
+        name: r.name || 'Recipient',
+        email: r.email || null,
+        phone: r.phone || null,
+        group_name: r.group_name || '',
+        custom_fields: typeof r.custom_fields === 'object' && r.custom_fields !== null ? r.custom_fields : {}
+      }));
+    } else {
+      let finalIds = [...(recipientIds || [])];
+      if (groupId && groupId !== 'all') {
+        const groupContacts = dbHelper.all('SELECT id FROM contacts WHERE group_id = ?', [groupId]);
+        finalIds = groupContacts.map(c => c.id);
+      } else if (groupId === 'all' || sendToAll || finalIds.length === 0) {
+        const allContacts = dbHelper.all('SELECT id FROM contacts');
+        finalIds = allContacts.map(c => c.id);
+      }
+      finalRecipientsData = finalIds;
     }
 
-    if (finalIds.length === 0) {
+    if (finalRecipientsData.length === 0) {
       return res.status(400).json({ error: 'No recipients selected for scheduling.' });
     }
 
@@ -259,8 +286,8 @@ export async function scheduleMessage(req, res) {
         short_version || '',
         cta || '',
         channel,
-        finalIds.length,
-        JSON.stringify(finalIds),
+        finalRecipientsData.length,
+        JSON.stringify(finalRecipientsData),
         'scheduled',
         isDemo
       ]
@@ -278,7 +305,7 @@ export async function scheduleMessage(req, res) {
         channel,
         subject || '',
         body,
-        JSON.stringify(finalIds),
+        JSON.stringify(finalRecipientsData),
         utcScheduledTime,
         timezone,
         isDemo
@@ -290,7 +317,7 @@ export async function scheduleMessage(req, res) {
       message: 'Message successfully scheduled for dispatch.',
       scheduledId: sched.lastInsertRowid,
       scheduled_time: utcScheduledTime,
-      recipientCount: finalIds.length
+      recipientCount: finalRecipientsData.length
     });
   } catch (err) {
     console.error('scheduleMessage error:', err);
