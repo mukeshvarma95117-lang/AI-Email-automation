@@ -408,10 +408,17 @@ export default function Generator() {
     const vars = {};
     const lower = prompt.toLowerCase();
 
-    // Time (e.g. 11 AM, 11:00 AM, 11am, 2:30 PM, 9 PM)
-    const timeMatch = prompt.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i);
+    // Time (e.g. 11 AM, 11:00 AM, 11am, 2:30 PM, 9 PM, at 11, at 11:00)
+    const timeMatch = prompt.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i)
+                   || prompt.match(/\bat\s+(\d{1,2}(?::\d{2})?)\b/i);
     if (timeMatch) {
-      vars.time = timeMatch[1].toUpperCase().replace(/\s*(AM|PM)/, ' $1').trim();
+      let rawTime = (timeMatch[1] || '').trim();
+      if (!/am|pm|o'?clock/i.test(rawTime)) {
+        const hourNum = parseInt(rawTime, 10);
+        const ampm = (hourNum >= 8 && hourNum <= 11) ? 'AM' : (hourNum === 12 ? 'PM' : (hourNum >= 1 && hourNum <= 7) ? 'PM' : 'AM');
+        rawTime = `${rawTime} ${ampm}`;
+      }
+      vars.time = rawTime.toUpperCase().replace(/\s*(AM|PM)/, ' $1').trim();
     }
 
     // Date

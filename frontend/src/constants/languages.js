@@ -888,9 +888,16 @@ export function generateMultilingualMessage({
 
   // Extract Time
   let eventTime = '10:00 AM';
-  const timeMatch = prompt.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i);
+  const timeMatch = prompt.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i)
+                 || prompt.match(/\bat\s+(\d{1,2}(?::\d{2})?)\b/i);
   if (timeMatch) {
-    eventTime = timeMatch[1].toUpperCase().replace(/\s*(AM|PM)/, ' $1').trim();
+    let rawTime = (timeMatch[1] || '').trim();
+    if (!/am|pm|o'?clock/i.test(rawTime)) {
+      const hourNum = parseInt(rawTime, 10);
+      const ampm = (hourNum >= 8 && hourNum <= 11) ? 'AM' : (hourNum === 12 ? 'PM' : (hourNum >= 1 && hourNum <= 7) ? 'PM' : 'AM');
+      rawTime = `${rawTime} ${ampm}`;
+    }
+    eventTime = rawTime.toUpperCase().replace(/\s*(AM|PM)/, ' $1').trim();
   }
 
   // Extract Date
@@ -999,3 +1006,4 @@ export function translateToLanguage({ subject = '', body = '', targetLanguage = 
     isMock: true
   };
 }
+
