@@ -1,5 +1,5 @@
 -- ==============================================================================
-Would he start twenty three hours use in our motor sex already at the news class plant and designers control shiftspeeds black
+-- SmartSend AI - Supabase Cloud Database Schema & RLS Setup
 -- Paste this script into Supabase SQL Editor:
 -- https://supabase.com/dashboard/project/joqherfotksjlpyztcdc/sql
 -- ==============================================================================
