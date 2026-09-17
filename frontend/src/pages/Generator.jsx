@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { substituteVariables, extractVariables } from '../utils/variableParser';
+import { SUPPORTED_LANGUAGES } from '../constants/languages';
 
 import VariablePills from '../components/generator/VariablePills';
 import AiActionButtons from '../components/generator/AiActionButtons';
@@ -49,7 +50,6 @@ const SAMPLE_PROMPTS = [
 ];
 
 const TONES = ['Professional', 'Friendly', 'Casual', 'Formal', 'Urgent', 'Promotional'];
-const LANGUAGES = ['English', 'Spanish', 'French', 'Hindi', 'German'];
 const TYPES = ['Reminder', 'Announcement', 'Invitation', 'Alert', 'Follow-up'];
 const LENGTHS = ['Short', 'Medium', 'Long'];
 
@@ -61,7 +61,14 @@ export default function Generator() {
   // Prompt configuration state
   const defaultInitialPrompt = 'Send a professional reminder to all students about tomorrow’s AI workshop at 10 AM.';
   const [prompt, setPrompt] = useState(defaultInitialPrompt);
-  const [lastGeneratedPrompt, setLastGeneratedPrompt] = useState(defaultInitialPrompt);
+  const [lastGeneratedConfig, setLastGeneratedConfig] = useState({
+    prompt: defaultInitialPrompt,
+    language: 'English',
+    tone: 'Professional',
+    channel: 'email',
+    messageType: 'Reminder',
+    length: 'Medium'
+  });
   const [tone, setTone] = useState('Professional');
   const [language, setLanguage] = useState('English');
   const [channel, setChannel] = useState('email');
@@ -295,9 +302,16 @@ export default function Generator() {
       setModelUsed(data.modelUsed || '');
       setIsMock(Boolean(data.isMock));
       setAiNotice(data.notice || '');
-      setLastGeneratedPrompt(prompt.trim());
+      setLastGeneratedConfig({
+        prompt: prompt.trim(),
+        language,
+        tone,
+        channel,
+        messageType,
+        length
+      });
 
-      success('AI message generated successfully!', 'Generation Complete');
+      success(`AI message generated successfully in ${language}!`, 'Generation Complete');
     } catch (err) {
       error(err.message || 'Failed to generate message copy.');
     } finally {
@@ -429,19 +443,32 @@ export default function Generator() {
     renderedSubject = renderedSubject.replace(timePattern, activePromptGlobalVars.time);
   }
 
-  // Check if description prompt has been modified since last generation
-  const isPromptModified = Boolean(body) && prompt.trim().length > 0 && prompt.trim() !== lastGeneratedPrompt.trim();
+  // Check if description prompt or configuration has been modified since last generation
+  const isPromptModified = Boolean(body) && (
+    (prompt.trim().length > 0 && prompt.trim() !== (lastGeneratedConfig.prompt || '').trim()) ||
+    language !== lastGeneratedConfig.language ||
+    tone !== lastGeneratedConfig.tone ||
+    messageType !== lastGeneratedConfig.messageType ||
+    length !== lastGeneratedConfig.length
+  );
 
-  // Auto-regenerate when prompt changes (debounced by 600ms) when user is not manually editing copy
+  // Auto-regenerate when prompt or language/tone changes (debounced by 500ms) when user is not manually editing copy
   useEffect(() => {
-    if (!body || isEditing || !prompt.trim() || prompt.trim() === lastGeneratedPrompt.trim()) {
+    const configMatches = 
+      prompt.trim() === (lastGeneratedConfig.prompt || '').trim() &&
+      language === lastGeneratedConfig.language &&
+      tone === lastGeneratedConfig.tone &&
+      messageType === lastGeneratedConfig.messageType &&
+      length === lastGeneratedConfig.length;
+
+    if (!body || isEditing || !prompt.trim() || configMatches) {
       return;
     }
     const timer = setTimeout(() => {
       handleGenerate();
-    }, 600);
+    }, 500);
     return () => clearTimeout(timer);
-  }, [prompt, tone, language, channel, messageType, length, body, isEditing, lastGeneratedPrompt]);
+  }, [prompt, tone, language, channel, messageType, length, body, isEditing, lastGeneratedConfig]);
 
   // Safety checks
   const missingTargets = currentRecipients.filter(c => channel === 'email' ? !c.email : !c.phone).length;
@@ -719,15 +746,20 @@ export default function Generator() {
               className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-950/60 text-slate-900 dark:text-white placeholder-slate-400 text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-colors"
             />
 
-            {/* Alert Banner when Description is modified */}
+            {/* Alert Banner when Description or Config is modified */}
             {isPromptModified && (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 rounded-2xl bg-gradient-to-r from-amber-500/10 via-indigo-500/10 to-purple-500/10 border border-amber-300 dark:border-amber-700/60 text-slate-800 dark:text-slate-200 text-xs animate-in fade-in slide-in-from-top-1 duration-200 shadow-sm">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-amber-500 shrink-0 animate-pulse" />
                   <div>
-                    <span className="font-bold text-amber-900 dark:text-amber-300">Description updated:</span>
+                    <span className="font-bold text-amber-900 dark:text-amber-300">
+                      {language !== lastGeneratedConfig.language ? `Language changed to ${language}:` : 'Description updated:'}
+                    </span>
                     <span className="ml-1 text-slate-700 dark:text-slate-300">
-                      New instructions detected. Click <strong>Update Email Now</strong> or press <kbd className="px-1.5 py-0.5 text-[10px] bg-white dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 font-mono shadow-xs">Ctrl+Enter</kbd> to refresh your email copy.
+                      {language !== lastGeneratedConfig.language
+                        ? `Generating copy in ${language}. Click Update Email Now or press `
+                        : 'New instructions detected. Click Update Email Now or press '}
+                      <kbd className="px-1.5 py-0.5 text-[10px] bg-white dark:bg-slate-800 rounded border border-slate-300 dark:border-slate-700 font-mono shadow-xs">Ctrl+Enter</kbd> to refresh your email copy.
                     </span>
                   </div>
                 </div>
@@ -780,13 +812,20 @@ export default function Generator() {
 
               {/* Language */}
               <div className="space-y-1">
-                <label className="font-semibold text-slate-500 text-[11px]">Language</label>
+                <label className="font-semibold text-slate-500 text-[11px] flex items-center justify-between">
+                  <span>Language</span>
+                  <span className="text-[10px] text-indigo-500 font-normal">23 Supported</span>
+                </label>
                 <select
                   value={language}
                   onChange={e => setLanguage(e.target.value)}
                   className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 font-medium focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 >
-                  {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
+                  {SUPPORTED_LANGUAGES.map(l => (
+                    <option key={l.name} value={l.name}>
+                      {l.native} ({l.name})
+                    </option>
+                  ))}
                 </select>
               </div>
 

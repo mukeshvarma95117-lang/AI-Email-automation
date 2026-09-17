@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { parseToUtc } from '../utils/dateUtils';
+import { generateMultilingualMessage, translateToLanguage } from '../constants/languages';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 const BASE_URL = API_URL.endsWith('/') ? API_URL.slice(0, -1) : API_URL;
@@ -184,57 +185,37 @@ function handleMockFallback(endpoint, options = {}) {
     let promptText = 'Send a professional reminder to all students about tomorrow’s AI workshop at 10 AM.';
     let tone = 'Professional';
     let channel = 'email';
+    let language = 'English';
+    let length = 'Medium';
+    let type = 'Reminder';
     try {
       if (options.body) {
         const parsed = JSON.parse(options.body);
         if (parsed.prompt) promptText = parsed.prompt;
         if (parsed.tone) tone = parsed.tone;
         if (parsed.channel) channel = parsed.channel;
+        if (parsed.language) language = parsed.language;
+        if (parsed.length) length = parsed.length;
+        if (parsed.type) type = parsed.type;
       }
     } catch (e) {}
 
-    const lower = promptText.toLowerCase();
-
-    // Extract event name
-    let eventName = 'Hands-On AI Workshop';
-    const aboutMatch = promptText.match(/\babout\s+(?:tomorrow['’]s\s+|today['’]s\s+)?([^.!?\n]+?)(?:\s+at\s+\d|\s+on\s+|\s+in\s+|\.|\?|!|$)/i);
-    if (aboutMatch && aboutMatch[1].trim().length > 2 && aboutMatch[1].trim().length < 50) {
-      eventName = aboutMatch[1].trim().replace(/\b\w/g, c => c.toUpperCase());
-    } else if (lower.includes('hackathon')) eventName = 'Inter-College Hackathon';
-    else if (lower.includes('interview')) eventName = 'Technical Round Interview';
-    else if (lower.includes('exam') || lower.includes('test')) eventName = 'Mid-Term Examination';
-    else if (lower.includes('webinar')) eventName = 'Live Interactive Webinar';
-    else if (lower.includes('meeting') || lower.includes('discussion')) eventName = 'Team Project Discussion';
-    else if (lower.includes('workshop')) eventName = 'Hands-On AI Workshop';
-    else if (lower.includes('sale') || lower.includes('discount')) eventName = 'Exclusive Seasonal Offer';
-
-    // Extract time
-    let eventTime = '10:00 AM';
-    const timeMatch = promptText.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i);
-    if (timeMatch) eventTime = timeMatch[1].toUpperCase();
-
-    // Extract date
-    let eventDate = 'tomorrow';
-    const dateMatch = promptText.match(/\b(tomorrow|today|tonight|this\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i);
-    if (dateMatch) eventDate = dateMatch[1];
-
-    let eventLocation = 'Lab 3B / Virtual Room';
-    const locMatch = promptText.match(/\b(?:in|at|via)\s+(Lab\s+[0-9A-Za-z]+|Room\s+[0-9A-Za-z]+|Zoom(?:\s+Room)?|Google Meet|Teams|Auditorium(?:\s+[0-9A-Za-z]+)?)\b/i);
-    if (locMatch) eventLocation = locMatch[1];
-
-    const greeting = tone === 'Formal' ? 'Respected {{name}},' : tone === 'Friendly' ? 'Hi {{name}}! 👋' : tone === 'Urgent' ? 'URGENT NOTICE: {{name}},' : 'Dear {{name}},';
-    const signoff = tone === 'Formal' ? 'With highest regards,\nDepartment Administration' : tone === 'Friendly' ? 'Cheers & see you there!\nThe Organizing Team' : 'Sincerely,\nAcademic & Event Coordination Team';
+    const result = generateMultilingualMessage({
+      language,
+      prompt: promptText,
+      tone,
+      channel,
+      length,
+      type
+    });
 
     return {
       success: true,
       data: {
-        subject: `${tone === 'Urgent' ? '[URGENT] ' : ''}Reminder: ${eventName} - ${eventDate.toUpperCase()} at ${eventTime}`,
-        body: `${greeting}\n\nThis is a reminder regarding your upcoming session for ${eventName} scheduled for ${eventDate} at ${eventTime}.\n\nSession Details:\n• Event: ${eventName}\n• Date & Time: ${eventDate} at ${eventTime}\n• Location: ${eventLocation}\n\nPlease review your preparation checklist and ensure your development environment is ready.\n\nIf you have any questions or schedule conflicts, please notify the coordinator as soon as possible.\n\n${signoff}`,
-        short_version: `Reminder: ${eventName} is scheduled for ${eventDate} at ${eventTime} in ${eventLocation}. Please arrive prepared.`,
-        cta: 'Join Session / View Schedule',
-        modelUsed: 'SmartSend GenAI Engine (Built-in)',
+        ...result,
+        modelUsed: `SmartSend Built-in Multilingual Engine (${language})`,
         isMock: true,
-        notice: 'Generated via built-in intelligent synthesizer.'
+        notice: `Generated via built-in intelligent synthesizer (${language}).`
       }
     };
   }
@@ -267,12 +248,22 @@ function handleMockFallback(endpoint, options = {}) {
   }
 
   if (endpoint.startsWith('/ai/translate')) {
+    let subject = '';
+    let body = '';
+    let targetLanguage = 'Spanish';
+    try {
+      if (options.body) {
+        const parsed = JSON.parse(options.body);
+        if (parsed.subject) subject = parsed.subject;
+        if (parsed.body) body = parsed.body;
+        if (parsed.targetLanguage) targetLanguage = parsed.targetLanguage;
+      }
+    } catch (e) {}
+
+    const result = translateToLanguage({ subject, body, targetLanguage });
     return {
       success: true,
-      data: {
-        subject: 'Actualización exclusiva para {{name}}',
-        body: 'Hola {{name}},\n\nQueríamos compartir una actualización importante sobre su espacio de trabajo.\n\nSaludos cordiales,\nEl equipo de SmartSend'
-      }
+      data: result
     };
   }
 

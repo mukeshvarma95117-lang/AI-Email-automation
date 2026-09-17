@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import { useTheme } from '../context/ThemeContext';
+import { SUPPORTED_LANGUAGES } from '../constants/languages';
 import {
   Settings as SettingsIcon,
   Sparkles,
@@ -863,7 +864,7 @@ export default function Settings() {
             </h3>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-1">
               <label className="font-semibold text-slate-500">Default Channel</label>
               <select
@@ -890,6 +891,21 @@ export default function Settings() {
                 <option value="Formal">Formal</option>
                 <option value="Urgent">Urgent</option>
                 <option value="Promotional">Promotional</option>
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-semibold text-slate-500">Default Language</label>
+              <select
+                value={settings.default_language}
+                onChange={e => handleChange('default_language', e.target.value)}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+              >
+                {SUPPORTED_LANGUAGES.map(l => (
+                  <option key={l.name} value={l.name}>
+                    {l.native} ({l.name})
+                  </option>
+                ))}
               </select>
             </div>
 

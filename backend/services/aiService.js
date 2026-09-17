@@ -1,4 +1,5 @@
 import dbHelper from '../database/db.js';
+import { generateMultilingualMessage, translateToLanguage } from './multilingualTemplates.js';
 
 function getLlmConfig() {
   const apiKeyRow = dbHelper.get("SELECT value FROM settings WHERE key = 'llm_api_key'");
@@ -15,131 +16,10 @@ function getLlmConfig() {
 /**
  * Intelligent built-in Mock & Smart Template Engine
  * Accurately analyzes prompts, tone, language, and actions when live LLM key is absent.
+ * Supports 23 major global and regional languages.
  */
-function mockGenerate({ prompt, tone = 'Professional', language = 'English', channel = 'email', length = 'Medium', type = 'Reminder' }) {
-  const lowerPrompt = (prompt || '').toLowerCase();
-
-  // Extract entities from prompt
-  let eventName = 'Hands-On AI Workshop';
-  let eventDate = 'tomorrow';
-  let eventTime = '10:00 AM';
-  let eventLocation = 'Lab 3B / Virtual Room';
-
-  // Smart prompt topic / event extraction
-  const aboutMatch = prompt.match(/\babout\s+(?:tomorrow['’]s\s+|today['’]s\s+)?([^.!?\n]+?)(?:\s+at\s+\d|\s+on\s+|\s+in\s+|\.|\?|!|$)/i);
-  if (aboutMatch && aboutMatch[1].trim().length > 2 && aboutMatch[1].trim().length < 50) {
-    eventName = aboutMatch[1].trim().replace(/\b\w/g, c => c.toUpperCase());
-  } else if (lowerPrompt.includes('workshop')) eventName = 'Hands-On AI Workshop';
-  else if (lowerPrompt.includes('hackathon')) eventName = 'Inter-College Hackathon';
-  else if (lowerPrompt.includes('interview')) eventName = 'Technical Round Interview';
-  else if (lowerPrompt.includes('exam') || lowerPrompt.includes('test')) eventName = 'Mid-Term Examination';
-  else if (lowerPrompt.includes('webinar')) eventName = 'Live Interactive Webinar';
-  else if (lowerPrompt.includes('meeting') || lowerPrompt.includes('discussion')) eventName = 'Team Project Discussion';
-  else if (lowerPrompt.includes('fee') || lowerPrompt.includes('payment')) eventName = 'Tuition Fee Due Date';
-  else if (lowerPrompt.includes('review') || lowerPrompt.includes('capstone')) eventName = 'Capstone Project Review';
-  else if (lowerPrompt.includes('sale') || lowerPrompt.includes('discount')) eventName = 'Exclusive Seasonal Offer';
-
-  // Extract time (e.g. 11 AM, 11:00 AM, 11am, 2:30 PM, 9 PM)
-  const timeMatch = prompt.match(/\b(\d{1,2}(?::\d{2})?\s*(?:am|pm|AM|PM)|\d{1,2}\s*o'?clock)\b/i);
-  if (timeMatch) {
-    eventTime = timeMatch[1].toUpperCase();
-  }
-
-  // Extract date / day
-  const dateMatch = prompt.match(/\b(tomorrow|today|tonight|this\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|next\s+(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)|monday|tuesday|wednesday|thursday|friday|saturday|sunday|(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2}(?:st|nd|rd|th)?|\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*)\b/i);
-  if (dateMatch) {
-    eventDate = dateMatch[1];
-  } else if (lowerPrompt.includes('tomorrow')) {
-    eventDate = 'tomorrow';
-  } else if (lowerPrompt.includes('today')) {
-    eventDate = 'today';
-  }
-
-  // Extract location
-  const locMatch = prompt.match(/\b(?:in|at|via)\s+(Lab\s+[0-9A-Za-z]+|Room\s+[0-9A-Za-z]+|Zoom(?:\s+Room)?|Google Meet|Teams|Auditorium(?:\s+[0-9A-Za-z]+)?)\b/i);
-  if (locMatch) {
-    eventLocation = locMatch[1];
-  }
-
-  // Tone variations
-  const greetings = {
-    Professional: 'Dear {{name}},',
-    Formal: 'Respected {{name}},',
-    Friendly: 'Hi {{name}}! 👋',
-    Casual: 'Hey {{name}},',
-    Urgent: 'URGENT NOTICE: {{name}},',
-    Promotional: 'Exclusive Update for you, {{name}}! 🚀'
-  };
-
-  const signoffs = {
-    Professional: 'Sincerely,\nAcademic & Event Coordination Team',
-    Formal: 'With highest regards,\nDepartment Administration',
-    Friendly: 'Cheers & see you there!\nThe Organizing Team',
-    Casual: 'Catch you soon,\nThe Team',
-    Urgent: 'Please act immediately.\nOperations Desk',
-    Promotional: 'Don’t miss out!\nSmartSend Team'
-  };
-
-  const greeting = greetings[tone] || greetings.Professional;
-  const signoff = signoffs[tone] || signoffs.Professional;
-
-  let subject = '';
-  let body = '';
-  let shortVersion = '';
-  let cta = 'Confirm Attendance';
-
-  if (channel === 'whatsapp') {
-    subject = `${tone === 'Urgent' ? '⚠️ ' : '📌 '}${eventName} Details`;
-    if (tone === 'Urgent') {
-      body = `${greeting}\n\n*Action Required:* Your scheduled session for *${eventName}* is happening on *${eventDate}* at *${eventTime}* in *${eventLocation}*.\n\nPlease confirm your attendance and bring your laptop ready.\n\n${signoff}`;
-      shortVersion = `⚠️ *URGENT:* ${eventName} on ${eventDate} at ${eventTime}. Reply YES to confirm.`;
-      cta = 'Reply YES to Confirm';
-    } else if (tone === 'Friendly' || tone === 'Casual') {
-      body = `${greeting}\n\nJust a quick heads up! *${eventName}* is taking place on *${eventDate}* at *${eventTime}* in *${eventLocation}*.\n\nWe’ve got an exciting agenda lined up. Let us know if you need anything beforehand!\n\n${signoff}`;
-      shortVersion = `👋 Hey {{name}}, reminder for ${eventName} on ${eventDate} at ${eventTime}. See you there!`;
-      cta = 'View Details';
-    } else {
-      body = `${greeting}\n\nThis is a notification regarding *${eventName}* scheduled for *${eventDate}* at *${eventTime}*.\n\nVenue: *${eventLocation}*.\nPlease ensure timely arrival.\n\n${signoff}`;
-      shortVersion = `Notification: ${eventName} on ${eventDate} at ${eventTime} in ${eventLocation}.`;
-      cta = 'Access Portal';
-    }
-  } else if (channel === 'sms') {
-    subject = '';
-    if (tone === 'Urgent') {
-      body = `ALERT: Hi {{name}}, your ${eventName} is on ${eventDate} at ${eventTime} (${eventLocation}). Please reply 1 to confirm your seat immediately.`;
-      shortVersion = `ALERT: ${eventName} on ${eventDate} @ ${eventTime}. Reply 1 to confirm.`;
-      cta = 'Reply 1';
-    } else {
-      body = `Hi {{name}}, reminder for ${eventName} scheduled on ${eventDate} at ${eventTime} in ${eventLocation}. Reply YES to confirm. - SmartSend`;
-      shortVersion = `Reminder: ${eventName} on ${eventDate} @ ${eventTime}. Reply YES to confirm.`;
-      cta = 'Reply YES';
-    }
-  } else {
-    // Email
-    subject = `${tone === 'Urgent' ? '[URGENT] ' : ''}Reminder: ${eventName} - ${eventDate.toUpperCase()} at ${eventTime}`;
-    body = `${greeting}\n\nThis is a reminder regarding your upcoming session for ${eventName} scheduled for ${eventDate} at ${eventTime}.\n\nSession Details:\n• Event: ${eventName}\n• Date & Time: ${eventDate} at ${eventTime}\n• Location: ${eventLocation}\n\nPlease review your preparation checklist and ensure your development environment is ready.\n\nIf you have any questions or schedule conflicts, please notify the coordinator as soon as possible.\n\n${signoff}`;
-    shortVersion = `Reminder: ${eventName} is scheduled for ${eventDate} at ${eventTime} in ${eventLocation}. Please arrive prepared.`;
-    cta = 'Join Session / View Schedule';
-  }
-
-  // Handle language translation in mock if requested
-  if (language && language !== 'English') {
-    const translationNotice = ` [Language: ${language}]`;
-    subject = subject ? `${subject}${translationNotice}` : '';
-  }
-
-  return {
-    subject,
-    body,
-    short_version: shortVersion,
-    cta,
-    tone,
-    channel,
-    language,
-    isMock: true,
-    modelUsed: 'SmartSend Built-in AI Engine',
-    notice: 'Generated using SmartSend contextual template engine. Configure an OpenAI-compatible API key in Settings for live cloud LLM responses.'
-  };
+function mockGenerate(params) {
+  return generateMultilingualMessage(params);
 }
 
 /**
@@ -157,19 +37,23 @@ export async function generateMessage(params) {
     const systemPrompt = `You are SmartSend AI, an expert messaging and copy generation agent for multi-channel communications (Email, WhatsApp, SMS).
 Your task is to take a user's instruction and generate high-converting, personalized, and channel-appropriate message copy.
 
-Requirements:
+CRITICAL LANGUAGE REQUIREMENT:
+You MUST generate the ENTIRE message (subject, body, short_version, cta) natively, fluently, and idiomatically in the requested language: ${language}.
+Do NOT write English unless the requested language is English!
+All headings, greeting, body copy, session details, and signoffs must be in ${language}.
+
+Additional Requirements:
 1. Dynamic Personalization:
    - Always incorporate {{name}} for the recipient's personal name.
    - For campaign specifics (such as event/topic, date, time, location, deadlines), if the user prompt provides them (e.g. 'tomorrow at 11 AM', 'AI workshop'), write those exact details DIRECTLY into the message copy so the output explicitly reflects the user's instructions.
    - Do NOT output {{time}}, {{date}}, or {{event}} placeholders when the user has provided specific times, dates, or topics in the prompt.
 2. Respect the selected Tone: ${tone}.
-3. Generate content in language: ${language}.
-4. Optimize format for Channel: ${channel}
+3. Optimize format for Channel: ${channel}
    - For Email: Create a compelling subject line, formatted email body, short preview text, and Call-To-Action (CTA).
    - For WhatsApp: Use WhatsApp markdown (*bold*, _italic_), emojis appropriately, concise paragraphs, and clear CTA. Subject is optional or a title.
    - For SMS: Keep under 160 characters if possible or compact, clear, with immediate CTA. Subject is not applicable.
-5. Respect desired length: ${length}.
-6. Message Type: ${type}.
+4. Respect desired length: ${length}.
+5. Message Type: ${type}.
 
 You MUST return ONLY a valid JSON object matching this schema with no markdown ticks outside it:
 {
@@ -333,21 +217,7 @@ export async function translateMessage({ subject, body, targetLanguage }) {
   const config = getLlmConfig();
 
   if (!config.apiKey) {
-    // Return with language tag
-    const langMap = {
-      Spanish: { subj: 'Recordatorio:', greeting: 'Hola {{name}},' },
-      French: { subj: 'Rappel:', greeting: 'Bonjour {{name}},' },
-      German: { subj: 'Erinnerung:', greeting: 'Hallo {{name}},' },
-      Hindi: { subj: 'स्मरण पत्र:', greeting: 'नमस्ते {{name}},' }
-    };
-    const sample = langMap[targetLanguage] || { subj: `[${targetLanguage}]`, greeting: `Hi {{name}} [${targetLanguage}],` };
-
-    return {
-      subject: subject ? `${sample.subj} ${subject}` : '',
-      body: body.replace(/^(Dear|Hi|Hey|Hello|Respected)[^\n,]*,?/i, sample.greeting),
-      language: targetLanguage,
-      isMock: true
-    };
+    return translateToLanguage({ subject, body, targetLanguage });
   }
 
   try {
