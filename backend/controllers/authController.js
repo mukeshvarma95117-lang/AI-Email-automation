@@ -52,10 +52,59 @@ export async function login(req, res) {
 }
 
 export async function register(req, res) {
-  return res.status(403).json({ 
-    error: 'Public registration is disabled. Only pre-configured administrators can access this workspace.',
-    code: 'REGISTRATION_DISABLED'
-  });
+  try {
+    const { name, email, password } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'Full name is required.' });
+    }
+
+    if (!email || !email.trim()) {
+      return res.status(400).json({ error: 'Email address is required.' });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters long.' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const existing = dbHelper.get('SELECT id FROM users WHERE email = ?', [normalizedEmail]);
+    if (existing) {
+      return res.status(409).json({ 
+        error: 'An account with this email address already exists. Please sign in instead.',
+        code: 'EMAIL_ALREADY_EXISTS'
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const insertRes = dbHelper.run(
+      'INSERT INTO users (name, email, password_hash, role, title, company) VALUES (?, ?, ?, ?, ?, ?)',
+      [name.trim(), normalizedEmail, passwordHash, 'user', 'Workspace Member', 'SmartSend AI']
+    );
+
+    const newUser = {
+      id: insertRes.lastInsertRowid,
+      name: name.trim(),
+      email: normalizedEmail,
+      role: 'user',
+      title: 'Workspace Member',
+      phone: '',
+      company: 'SmartSend AI',
+      bio: '',
+      avatar_url: ''
+    };
+
+    const token = generateToken(newUser);
+
+    return res.status(201).json({
+      message: 'Account registered successfully',
+      token,
+      user: newUser
+    });
+  } catch (err) {
+    console.error('Registration error:', err);
+    return res.status(500).json({ error: 'Server error during registration.' });
+  }
 }
 
 export function getCurrentUser(req, res) {

@@ -477,9 +477,6 @@ export const api = {
       throw new Error('Please enter both your email and password.');
     }
 
-    const isAdminEmail = cleanEmail === 'admin@smartsendai.online';
-    const isMatchingPassword = cleanPassword === 'Smartsend@123';
-
     // 1. Direct Supabase Auth attempt if configured
     if (isSupabaseConfigured) {
       try {
@@ -489,11 +486,15 @@ export const api = {
         });
 
         if (!error && data?.session && data?.user) {
+          const meta = data.user.user_metadata || {};
           const user = {
             id: data.user.id,
-            name: 'SmartSend Administrator',
-            email: 'admin@smartsendai.online',
-            role: 'admin'
+            name: meta.name || meta.full_name || cleanEmail.split('@')[0],
+            email: data.user.email,
+            role: meta.role || (cleanEmail === 'admin@smartsendai.online' ? 'admin' : 'user'),
+            title: meta.title || (cleanEmail === 'admin@smartsendai.online' ? 'Lead Administrator' : 'Workspace Member'),
+            company: meta.company || 'SmartSend AI',
+            avatar_url: meta.avatar_url || ''
           };
           localStorage.setItem('smartsend_token', data.session.access_token);
           localStorage.setItem('smartsend_user', JSON.stringify(user));
@@ -508,30 +509,41 @@ export const api = {
       }
     }
 
-    // 2. Strict Administrator Validation
+    // 2. Attempt Express Backend Login
+    try {
+      const resp = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, password: cleanPassword })
+      });
+      if (resp.ok) {
+        const bData = await resp.json();
+        if (bData.token && bData.user) {
+          localStorage.setItem('smartsend_token', bData.token);
+          localStorage.setItem('smartsend_user', JSON.stringify(bData.user));
+          return {
+            success: true,
+            token: bData.token,
+            user: bData.user
+          };
+        }
+      }
+    } catch (e) {}
+
+    // 3. Default Administrator Credential Check
+    const isAdminEmail = cleanEmail === 'admin@smartsendai.online';
+    const isMatchingPassword = cleanPassword === 'Smartsend@123';
     if (isAdminEmail && isMatchingPassword) {
-      let user = {
+      const user = {
         id: 'admin_1',
         name: 'SmartSend Administrator',
         email: 'admin@smartsendai.online',
-        role: 'admin'
+        role: 'admin',
+        title: 'Lead Administrator',
+        company: 'SmartSend AI',
+        avatar_url: ''
       };
-      let token = 'smartsend_sec_' + btoa('admin@smartsendai.online:' + Date.now());
-
-      // Attempt to authenticate with backend if running to get full JWT token
-      try {
-        const resp = await fetch('/api/auth/login', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: cleanEmail, password: cleanPassword })
-        });
-        if (resp.ok) {
-          const bData = await resp.json();
-          if (bData.token) token = bData.token;
-          if (bData.user) user = bData.user;
-        }
-      } catch (e) {}
-
+      const token = 'smartsend_sec_' + btoa('admin@smartsendai.online:' + Date.now());
       localStorage.setItem('smartsend_token', token);
       localStorage.setItem('smartsend_user', JSON.stringify(user));
       return {
@@ -541,11 +553,162 @@ export const api = {
       };
     }
 
-    // 3. Deny any other credentials
-    throw new Error('Invalid email or password. Please try again.');
+    // 4. Client-side Registered Accounts Check
+    try {
+      const existingUsersStr = localStorage.getItem('smartsend_registered_users');
+      if (existingUsersStr) {
+        const existingUsers = JSON.parse(existingUsersStr);
+        const found = existingUsers.find(u => u.email.toLowerCase() === cleanEmail && u.password === cleanPassword);
+        if (found) {
+          const safeUser = { ...found };
+          delete safeUser.password;
+          const token = 'smartsend_usr_' + btoa(cleanEmail + ':' + Date.now());
+          localStorage.setItem('smartsend_token', token);
+          localStorage.setItem('smartsend_user', JSON.stringify(safeUser));
+          return {
+            success: true,
+            token,
+            user: safeUser
+          };
+        }
+      }
+    } catch (e) {}
+
+    // 5. Authentication Failed
+    throw new Error('Invalid email or password. Please verify your credentials or create a new account.');
   },
-  register: async () => {
-    throw new Error('Registration is currently disabled.');
+  register: async (userData) => {
+    const { name, email, password } = userData || {};
+    const cleanName = (name || '').trim();
+    const cleanEmail = (email || '').trim().toLowerCase();
+    const cleanPassword = (password || '').trim();
+
+    if (!cleanName) {
+      throw new Error('Please enter your full name.');
+    }
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      throw new Error('Please provide a valid email address.');
+    }
+    if (!cleanPassword || cleanPassword.length < 6) {
+      throw new Error('Password must be at least 6 characters long.');
+    }
+
+    // 1. Direct Supabase Auth sign-up if configured
+    if (isSupabaseConfigured) {
+      try {
+        const { data, error } = await supabase.auth.signUp({
+          email: cleanEmail,
+          password: cleanPassword,
+          options: {
+            data: {
+              name: cleanName,
+              full_name: cleanName,
+              role: 'user',
+              title: 'Workspace Member',
+              company: 'SmartSend AI'
+            }
+          }
+        });
+
+        if (!error && data?.user) {
+          const newUser = {
+            id: data.user.id,
+            name: cleanName,
+            email: cleanEmail,
+            role: 'user',
+            title: 'Workspace Member',
+            company: 'SmartSend AI',
+            avatar_url: ''
+          };
+          const token = data.session?.access_token || ('supabase_sec_' + btoa(cleanEmail + ':' + Date.now()));
+          localStorage.setItem('smartsend_token', token);
+          localStorage.setItem('smartsend_user', JSON.stringify(newUser));
+          return {
+            success: true,
+            token,
+            user: newUser,
+            message: 'Account registered successfully!'
+          };
+        } else if (error) {
+          console.warn('Supabase signup notice:', error.message);
+          if (error.message.toLowerCase().includes('already registered') || error.message.toLowerCase().includes('already exists')) {
+            throw new Error('An account with this email address already exists. Please sign in.');
+          }
+        }
+      } catch (err) {
+        if (err.message && err.message.includes('already exists')) throw err;
+        console.warn('Supabase signup fallback:', err);
+      }
+    }
+
+    // 2. Attempt Express Backend Registration
+    try {
+      const resp = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: cleanName, email: cleanEmail, password: cleanPassword })
+      });
+      if (resp.ok) {
+        const bData = await resp.json();
+        if (bData.token && bData.user) {
+          localStorage.setItem('smartsend_token', bData.token);
+          localStorage.setItem('smartsend_user', JSON.stringify(bData.user));
+          return {
+            success: true,
+            token: bData.token,
+            user: bData.user,
+            message: bData.message || 'Account registered successfully!'
+          };
+        }
+      } else {
+        const errData = await resp.json().catch(() => ({}));
+        if (resp.status === 409 || (errData.error && errData.error.includes('already exists'))) {
+          throw new Error(errData.error || 'An account with this email address already exists. Please sign in.');
+        }
+      }
+    } catch (e) {
+      if (e.message && e.message.includes('already exists')) throw e;
+    }
+
+    // 3. Fallback Client-side Account Storage
+    try {
+      const existingUsersStr = localStorage.getItem('smartsend_registered_users');
+      const existingUsers = existingUsersStr ? JSON.parse(existingUsersStr) : [];
+      if (existingUsers.some(u => u.email.toLowerCase() === cleanEmail)) {
+        throw new Error('An account with this email address already exists. Please sign in instead.');
+      }
+
+      const newUser = {
+        id: 'user_' + Date.now(),
+        name: cleanName,
+        email: cleanEmail,
+        password: cleanPassword,
+        role: 'user',
+        title: 'Workspace Member',
+        company: 'SmartSend AI',
+        avatar_url: '',
+        created_at: new Date().toISOString()
+      };
+
+      existingUsers.push(newUser);
+      localStorage.setItem('smartsend_registered_users', JSON.stringify(existingUsers));
+
+      const token = 'smartsend_usr_' + btoa(cleanEmail + ':' + Date.now());
+      const safeUser = { ...newUser };
+      delete safeUser.password;
+
+      localStorage.setItem('smartsend_token', token);
+      localStorage.setItem('smartsend_user', JSON.stringify(safeUser));
+
+      return {
+        success: true,
+        token,
+        user: safeUser,
+        message: 'Account registered successfully!'
+      };
+    } catch (e) {
+      throw e;
+    }
   },
   getMe: async () => {
     if (isSupabaseConfigured) {

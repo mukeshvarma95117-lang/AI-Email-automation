@@ -46,21 +46,22 @@ export function AuthProvider({ children }) {
           const { data: { session }, error } = await supabase.auth.getSession();
           if (session?.user && session?.access_token && mounted) {
             const meta = session.user.user_metadata || {};
-            const adminUser = {
+            const isDefaultAdmin = (session.user.email || '').toLowerCase() === 'admin@smartsendai.online';
+            const activeUser = {
               id: session.user.id,
               name: meta.name || meta.full_name || session.user.email?.split('@')[0],
               email: session.user.email,
-              role: 'admin',
-              title: meta.title || 'Lead Administrator',
+              role: meta.role || (isDefaultAdmin ? 'admin' : 'user'),
+              title: meta.title || (isDefaultAdmin ? 'Lead Administrator' : 'Workspace Member'),
               phone: meta.phone || '',
               company: meta.company || 'SmartSend AI',
               bio: meta.bio || '',
               avatar_url: meta.avatar_url || ''
             };
             setToken(session.access_token);
-            setUser(adminUser);
+            setUser(activeUser);
             localStorage.setItem('smartsend_token', session.access_token);
-            localStorage.setItem('smartsend_user', JSON.stringify(adminUser));
+            localStorage.setItem('smartsend_user', JSON.stringify(activeUser));
             setLoading(false);
             return;
           }
@@ -76,7 +77,7 @@ export function AuthProvider({ children }) {
       if (existingToken && !existingToken.startsWith('demo-') && !existingToken.startsWith('mock-') && existingUserStr && mounted) {
         try {
           const parsedUser = JSON.parse(existingUserStr);
-          if (parsedUser && (parsedUser.email || '').toLowerCase() === 'admin@smartsendai.online') {
+          if (parsedUser && parsedUser.email) {
             setToken(existingToken);
             setUser(parsedUser);
             setLoading(false);
@@ -104,21 +105,22 @@ export function AuthProvider({ children }) {
         if (!mounted) return;
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.user && session?.access_token) {
           const meta = session.user.user_metadata || {};
-          const adminUser = {
+          const isDefaultAdmin = (session.user.email || '').toLowerCase() === 'admin@smartsendai.online';
+          const activeUser = {
             id: session.user.id,
             name: meta.name || meta.full_name || session.user.email?.split('@')[0],
             email: session.user.email,
-            role: 'admin',
-            title: meta.title || 'Lead Administrator',
+            role: meta.role || (isDefaultAdmin ? 'admin' : 'user'),
+            title: meta.title || (isDefaultAdmin ? 'Lead Administrator' : 'Workspace Member'),
             phone: meta.phone || '',
             company: meta.company || 'SmartSend AI',
             bio: meta.bio || '',
             avatar_url: meta.avatar_url || ''
           };
           setToken(session.access_token);
-          setUser(adminUser);
+          setUser(activeUser);
           localStorage.setItem('smartsend_token', session.access_token);
-          localStorage.setItem('smartsend_user', JSON.stringify(adminUser));
+          localStorage.setItem('smartsend_user', JSON.stringify(activeUser));
         } else if (event === 'SIGNED_OUT') {
           setToken(null);
           setUser(null);
@@ -146,6 +148,17 @@ export function AuthProvider({ children }) {
     return res;
   };
 
+  const register = async (name, email, password) => {
+    const res = await api.register({ name, email, password });
+    if (res?.token && res?.user) {
+      localStorage.setItem('smartsend_token', res.token);
+      localStorage.setItem('smartsend_user', JSON.stringify(res.user));
+      setToken(res.token);
+      setUser(res.user);
+    }
+    return res;
+  };
+
   const updateProfile = async (profileData) => {
     const res = await api.updateProfile(profileData);
     if (res?.user) {
@@ -159,10 +172,6 @@ export function AuthProvider({ children }) {
       });
     }
     return res;
-  };
-
-  const register = async () => {
-    throw new Error('Public registration is disabled. Only authorized administrators can access this workspace.');
   };
 
   const logout = async () => {

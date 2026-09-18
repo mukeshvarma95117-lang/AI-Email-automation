@@ -3,19 +3,35 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
-import { Sparkles, AlertCircle, Sun, Moon, Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowRight } from 'lucide-react';
+import { 
+  Sparkles, 
+  AlertCircle, 
+  Sun, 
+  Moon, 
+  Lock, 
+  Mail, 
+  User, 
+  Eye, 
+  EyeOff, 
+  ShieldCheck, 
+  ArrowRight,
+  CheckCircle2
+} from 'lucide-react';
 
-export default function Login() {
+export default function Signup() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [agreeTerms, setAgreeTerms] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const { login, isAuthenticated } = useAuth();
+  const { register, isAuthenticated } = useAuth();
   const { toggleTheme, isDark } = useTheme();
-  const { success, error, info } = useToast();
+  const { success, error } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -24,23 +40,59 @@ export default function Login() {
     }
   }, [isAuthenticated, navigate]);
 
-  const handleLoginSubmit = async (e) => {
+  const handleSignupSubmit = async (e) => {
     e.preventDefault();
     setErrorMessage('');
-    setLoading(true);
 
-    if (!email || !password) {
-      error('Please enter both your email and password.');
-      setLoading(false);
+    const cleanName = name.trim();
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+    const cleanConfirm = confirmPassword.trim();
+
+    // Validation
+    if (!cleanName) {
+      const msg = 'Please enter your full name.';
+      setErrorMessage(msg);
+      error(msg);
       return;
     }
 
+    if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      const msg = 'Please enter a valid email address.';
+      setErrorMessage(msg);
+      error(msg);
+      return;
+    }
+
+    if (!cleanPassword || cleanPassword.length < 6) {
+      const msg = 'Password must be at least 6 characters long.';
+      setErrorMessage(msg);
+      error(msg);
+      return;
+    }
+
+    if (cleanPassword !== cleanConfirm) {
+      const msg = 'Passwords do not match. Please re-enter your password.';
+      setErrorMessage(msg);
+      error(msg);
+      return;
+    }
+
+    if (!agreeTerms) {
+      const msg = 'Please accept the Terms of Service to create your workspace account.';
+      setErrorMessage(msg);
+      error(msg);
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      await login(email.trim(), password);
-      success('Welcome back! Signed into SmartSend AI workspace.');
+      await register(cleanName, cleanEmail, cleanPassword);
+      success(`Welcome to SmartSend AI, ${cleanName}! Your workspace account is ready.`, 'Account Created');
       navigate('/');
     } catch (err) {
-      const msg = err.message || 'Authentication failed. Please check your credentials.';
+      const msg = err.message || 'Failed to create your account. Please try again.';
       setErrorMessage(msg);
       error(msg);
     } finally {
@@ -74,10 +126,10 @@ export default function Login() {
       </div>
 
       {/* Main Container Card */}
-      <div className="relative w-full max-w-4xl min-h-[560px] bg-white dark:bg-[#141820] rounded-[32px] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.12)] border border-slate-100 dark:border-slate-800/80 overflow-hidden flex flex-col md:flex-row">
+      <div className="relative w-full max-w-4xl min-h-[600px] bg-white dark:bg-[#141820] rounded-[32px] shadow-[0_25px_70px_-15px_rgba(0,0,0,0.12)] border border-slate-100 dark:border-slate-800/80 overflow-hidden flex flex-col md:flex-row">
         
         {/* ========================================================================= */}
-        {/* LEFT PANEL: Clean, Focused Sign-In Form                                  */}
+        {/* LEFT PANEL: Clean, Focused Sign-Up Form                                  */}
         {/* ========================================================================= */}
         <div className="w-full md:w-1/2 p-8 sm:p-12 flex flex-col justify-between">
           <div>
@@ -95,17 +147,17 @@ export default function Login() {
                   SmartSend AI
                 </span>
                 <span className="text-[10px] text-slate-400 font-medium block -mt-1">
-                  Enterprise Automation
+                  Intelligent Messaging
                 </span>
               </div>
             </div>
 
             <div className="mb-6">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1c1e21] dark:text-white">
-                Workspace Sign In
+                Create Account
               </h1>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Enter your credentials to access your account.
+                Join SmartSend AI to compose, schedule, and automate messaging.
               </p>
             </div>
 
@@ -117,9 +169,29 @@ export default function Login() {
               </div>
             )}
 
-            {/* Sign In Form */}
-            <form onSubmit={handleLoginSubmit} className="space-y-4 text-xs">
-              <div className="space-y-1.5">
+            {/* Sign Up Form */}
+            <form onSubmit={handleSignupSubmit} className="space-y-3.5 text-xs">
+              {/* Full Name */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Full Name</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Mukesh Varma"
+                  value={name}
+                  onChange={e => {
+                    setName(e.target.value);
+                    setErrorMessage('');
+                  }}
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#f2f4f7] dark:bg-slate-800/80 border border-transparent focus:border-indigo-500 text-[#1c1e21] dark:text-white text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+                />
+              </div>
+
+              {/* Email Address */}
+              <div className="space-y-1">
                 <label className="text-[11px] font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                   <Mail className="w-3.5 h-3.5 text-slate-400" />
                   <span>Email Address</span>
@@ -133,11 +205,12 @@ export default function Login() {
                     setEmail(e.target.value);
                     setErrorMessage('');
                   }}
-                  className="w-full px-4 py-3 rounded-xl bg-[#f2f4f7] dark:bg-slate-800/80 border border-transparent focus:border-indigo-500 text-[#1c1e21] dark:text-white text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+                  className="w-full px-4 py-2.5 rounded-xl bg-[#f2f4f7] dark:bg-slate-800/80 border border-transparent focus:border-indigo-500 text-[#1c1e21] dark:text-white text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
                 />
               </div>
 
-              <div className="space-y-1.5">
+              {/* Password */}
+              <div className="space-y-1">
                 <label className="text-[11px] font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
                   <Lock className="w-3.5 h-3.5 text-slate-400" />
                   <span>Password</span>
@@ -146,13 +219,13 @@ export default function Login() {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     required
-                    placeholder="••••••••"
+                    placeholder="At least 6 characters"
                     value={password}
                     onChange={e => {
                       setPassword(e.target.value);
                       setErrorMessage('');
                     }}
-                    className="w-full px-4 py-3 pr-11 rounded-xl bg-[#f2f4f7] dark:bg-slate-800/80 border border-transparent focus:border-indigo-500 text-[#1c1e21] dark:text-white text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+                    className="w-full px-4 py-2.5 pr-11 rounded-xl bg-[#f2f4f7] dark:bg-slate-800/80 border border-transparent focus:border-indigo-500 text-[#1c1e21] dark:text-white text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
                   />
                   <button
                     type="button"
@@ -166,66 +239,92 @@ export default function Login() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                <label className="flex items-center gap-2 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={e => setRememberMe(e.target.checked)}
-                    className="w-3.5 h-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600"
-                  />
-                  <span>Remember session</span>
+              {/* Confirm Password */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-medium text-slate-600 dark:text-slate-300 flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Confirm Password</span>
                 </label>
-
-                <button
-                  type="button"
-                  onClick={() => info('Please contact your administrator to reset your credentials.', 'Password Reset')}
-                  className="hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors"
-                >
-                  Forgot password?
-                </button>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    placeholder="Re-enter your password"
+                    value={confirmPassword}
+                    onChange={e => {
+                      setConfirmPassword(e.target.value);
+                      setErrorMessage('');
+                    }}
+                    className="w-full px-4 py-2.5 pr-11 rounded-xl bg-[#f2f4f7] dark:bg-slate-800/80 border border-transparent focus:border-indigo-500 text-[#1c1e21] dark:text-white text-xs placeholder-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:outline-none transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    tabIndex={-1}
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors cursor-pointer"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
+              {/* Terms Checkbox */}
+              <div className="pt-1">
+                <label className="flex items-start gap-2 cursor-pointer select-none text-[11px] text-slate-600 dark:text-slate-400">
+                  <input
+                    type="checkbox"
+                    checked={agreeTerms}
+                    onChange={e => setAgreeTerms(e.target.checked)}
+                    className="w-3.5 h-3.5 mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 accent-indigo-600 shrink-0"
+                  />
+                  <span>
+                    I agree to the SmartSend AI Workspace Terms of Service and Privacy Policy.
+                  </span>
+                </label>
+              </div>
+
+              {/* Submit Button */}
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full mt-3 py-3.5 px-4 rounded-xl font-bold tracking-wider text-xs uppercase bg-[#1c1e21] dark:bg-indigo-600 hover:bg-black dark:hover:bg-indigo-500 text-white shadow-md active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full mt-2 py-3 px-4 rounded-xl font-bold tracking-wider text-xs uppercase bg-[#1c1e21] dark:bg-indigo-600 hover:bg-black dark:hover:bg-indigo-500 text-white shadow-md active:scale-[0.99] disabled:opacity-50 transition-all flex items-center justify-center gap-2 cursor-pointer"
               >
                 {loading ? (
                   <>
                     <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Authenticating...</span>
+                    <span>Creating Account...</span>
                   </>
                 ) : (
                   <>
-                    <span>Sign In to Workspace</span>
+                    <span>Create Workspace Account</span>
                     <ArrowRight className="w-3.5 h-3.5" />
                   </>
                 )}
               </button>
             </form>
 
-            {/* Link to Signup */}
+            {/* Link to Login */}
             <div className="mt-5 text-center text-xs text-slate-500 dark:text-slate-400">
-              <span>Don't have an account? </span>
+              <span>Already have an account? </span>
               <Link
-                to="/signup"
+                to="/login"
                 className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline cursor-pointer"
               >
-                Sign Up
+                Sign In
               </Link>
             </div>
           </div>
 
           {/* Security Notice Footer */}
-          <div className="pt-6 border-t border-slate-100 dark:border-slate-800/80 mt-6 flex items-center gap-2 text-[11px] text-slate-400">
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800/80 mt-5 flex items-center gap-2 text-[11px] text-slate-400">
             <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-            <span>Protected workspace environment.</span>
+            <span>Secure registration with encrypted credentials.</span>
           </div>
         </div>
 
         {/* ========================================================================= */}
-        {/* RIGHT PANEL: Visual Artwork & Security Information                       */}
+        {/* RIGHT PANEL: Visual Artwork & Feature Highlights                          */}
         {/* ========================================================================= */}
         <div className="hidden md:flex md:w-1/2 p-3">
           <div className="relative w-full h-full rounded-[26px] overflow-hidden flex flex-col justify-between p-8 sm:p-10 text-white shadow-2xl select-none">
@@ -249,24 +348,40 @@ export default function Login() {
             {/* Centered Typography */}
             <div className="relative z-10 space-y-3">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-500/30 backdrop-blur-sm border border-indigo-400/30 text-[11px] font-medium text-indigo-200">
-                <ShieldCheck className="w-3.5 h-3.5 text-indigo-300" />
-                <span>Supabase Protected</span>
+                <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
+                <span>Next-Gen Communications</span>
               </div>
               <h2 className="text-3xl font-extrabold tracking-tight text-white drop-shadow-md">
-                Admin Console
+                Automate with AI
               </h2>
               <p className="text-xs sm:text-sm text-slate-200/90 leading-relaxed font-normal drop-shadow max-w-sm">
-                Single unified portal for AI-powered multi-channel communication, Resend live email delivery, and recipient contact management.
+                Generate personalized reminders, translate copy into 12+ languages, schedule dispatches, and reach contacts across Email and SMS seamlessly.
               </p>
+
+              {/* Feature Points */}
+              <div className="pt-2 space-y-2 text-xs text-slate-200">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Real-time variable personalization</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Automated queue & scheduled campaigns</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span>Multi-channel Email, SMS & WhatsApp support</span>
+                </div>
+              </div>
             </div>
 
             {/* Bottom Status Card */}
             <div className="relative z-10 p-3.5 rounded-2xl bg-black/40 backdrop-blur-md border border-white/10 text-[11px] text-slate-300 flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></div>
-                <span className="text-white font-semibold">Protected Environment</span>
+                <span className="text-white font-semibold">Instant Onboarding</span>
               </div>
-              <span className="text-slate-400">Team Admin Access</span>
+              <span className="text-slate-400">Join Free Today</span>
             </div>
 
           </div>
@@ -276,3 +391,4 @@ export default function Login() {
     </div>
   );
 }
+

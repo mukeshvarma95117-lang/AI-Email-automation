@@ -7,6 +7,7 @@ import { ToastProvider } from './context/ToastContext';
 import Navbar from './components/layout/Navbar';
 
 import Login from './pages/Login';
+import Signup from './pages/Signup';
 import Dashboard from './pages/Dashboard';
 import Generator from './pages/Generator';
 import Contacts from './pages/Contacts';
@@ -79,6 +80,15 @@ export default function App() {
                   </PublicRoute>
                 } 
               />
+              <Route 
+                path="/signup" 
+                element={
+                  <PublicRoute>
+                    <Signup />
+                  </PublicRoute>
+                } 
+              />
+              <Route path="/register" element={<Navigate to="/signup" replace />} />
               <Route element={<ProtectedLayout />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/generator" element={<Generator />} />
