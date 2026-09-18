@@ -637,6 +637,28 @@ export const api = {
             await supabase.auth.signOut();
           } catch (_) {}
 
+          const saveLocalRegistry = () => {
+            try {
+              const existingUsersStr = localStorage.getItem('smartsend_registered_users');
+              const existingUsers = existingUsersStr ? JSON.parse(existingUsersStr) : [];
+              if (!existingUsers.some(u => u.email.toLowerCase() === cleanEmail)) {
+                existingUsers.push({
+                  id: newUser.id,
+                  name: cleanName,
+                  email: cleanEmail,
+                  password: cleanPassword,
+                  role: 'user',
+                  title: 'Workspace Member',
+                  company: 'SmartSend AI',
+                  avatar_url: '',
+                  created_at: new Date().toISOString()
+                });
+                localStorage.setItem('smartsend_registered_users', JSON.stringify(existingUsers));
+              }
+            } catch (_) {}
+          };
+          saveLocalRegistry();
+
           return {
             success: true,
             user: newUser,
@@ -664,7 +686,25 @@ export const api = {
       if (resp.ok) {
         const bData = await resp.json();
         if (bData.user) {
-          // Do not store token/user in localStorage; user must log in explicitly
+          try {
+            const existingUsersStr = localStorage.getItem('smartsend_registered_users');
+            const existingUsers = existingUsersStr ? JSON.parse(existingUsersStr) : [];
+            if (!existingUsers.some(u => u.email.toLowerCase() === cleanEmail)) {
+              existingUsers.push({
+                id: bData.user.id || ('user_' + Date.now()),
+                name: cleanName,
+                email: cleanEmail,
+                password: cleanPassword,
+                role: 'user',
+                title: 'Workspace Member',
+                company: 'SmartSend AI',
+                avatar_url: '',
+                created_at: new Date().toISOString()
+              });
+              localStorage.setItem('smartsend_registered_users', JSON.stringify(existingUsers));
+            }
+          } catch (_) {}
+
           return {
             success: true,
             user: bData.user,

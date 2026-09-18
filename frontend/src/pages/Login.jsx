@@ -22,7 +22,9 @@ export default function Login() {
   const [email, setEmail] = useState(() => {
     return location.state?.email || (typeof window !== 'undefined' ? localStorage.getItem('smartsend_remembered_email') || '' : '');
   });
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(() => {
+    return location.state?.password || '';
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -38,6 +40,9 @@ export default function Login() {
   useEffect(() => {
     if (location.state?.email) {
       setEmail(location.state.email);
+    }
+    if (location.state?.password) {
+      setPassword(location.state.password);
     }
     if (location.state?.message) {
       setSuccessMessage(location.state.message);

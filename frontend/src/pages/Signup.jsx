@@ -89,13 +89,14 @@ export default function Signup() {
 
     try {
       await register(cleanName, cleanEmail, cleanPassword);
-      success(`Account created successfully for ${cleanEmail}! Please sign in to access your workspace.`, 'Registration Complete');
+      success(`Account created successfully for ${cleanEmail}! Your sign-in details have been provided on the login page.`, 'Registration Complete');
       navigate('/login', {
         replace: true,
         state: {
           email: cleanEmail,
+          password: cleanPassword,
           justSignedUp: true,
-          message: `Account created for ${cleanEmail}! Please enter your password to sign in.`
+          message: `Account created for ${cleanEmail}! Your sign-in details have been filled in below. Click Sign In to enter your workspace.`
         }
       });
     } catch (err) {
