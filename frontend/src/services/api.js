@@ -620,14 +620,15 @@ export const api = {
             company: 'SmartSend AI',
             avatar_url: ''
           };
-          const token = data.session?.access_token || ('supabase_sec_' + btoa(cleanEmail + ':' + Date.now()));
-          localStorage.setItem('smartsend_token', token);
-          localStorage.setItem('smartsend_user', JSON.stringify(newUser));
+          // Sign out immediately so user is not automatically authenticated
+          try {
+            await supabase.auth.signOut();
+          } catch (_) {}
+
           return {
             success: true,
-            token,
             user: newUser,
-            message: 'Account registered successfully!'
+            message: 'Account registered successfully! Please log in.'
           };
         } else if (error) {
           console.warn('Supabase signup notice:', error.message);
@@ -650,14 +651,12 @@ export const api = {
       });
       if (resp.ok) {
         const bData = await resp.json();
-        if (bData.token && bData.user) {
-          localStorage.setItem('smartsend_token', bData.token);
-          localStorage.setItem('smartsend_user', JSON.stringify(bData.user));
+        if (bData.user) {
+          // Do not store token/user in localStorage; user must log in explicitly
           return {
             success: true,
-            token: bData.token,
             user: bData.user,
-            message: bData.message || 'Account registered successfully!'
+            message: bData.message || 'Account registered successfully! Please log in.'
           };
         }
       } else {
@@ -693,18 +692,14 @@ export const api = {
       existingUsers.push(newUser);
       localStorage.setItem('smartsend_registered_users', JSON.stringify(existingUsers));
 
-      const token = 'smartsend_usr_' + btoa(cleanEmail + ':' + Date.now());
       const safeUser = { ...newUser };
       delete safeUser.password;
 
-      localStorage.setItem('smartsend_token', token);
-      localStorage.setItem('smartsend_user', JSON.stringify(safeUser));
-
+      // Note: Do NOT store smartsend_token or smartsend_user here. User must log in on the Login page.
       return {
         success: true,
-        token,
         user: safeUser,
-        message: 'Account registered successfully!'
+        message: 'Account registered successfully! Please log in.'
       };
     } catch (e) {
       throw e;

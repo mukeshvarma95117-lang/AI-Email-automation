@@ -89,8 +89,15 @@ export default function Signup() {
 
     try {
       await register(cleanName, cleanEmail, cleanPassword);
-      success(`Welcome to SmartSend AI, ${cleanName}! Your workspace account is ready.`, 'Account Created');
-      navigate('/');
+      success(`Account created successfully for ${cleanEmail}! Please sign in to access your workspace.`, 'Registration Complete');
+      navigate('/login', {
+        replace: true,
+        state: {
+          email: cleanEmail,
+          justSignedUp: true,
+          message: `Account created for ${cleanEmail}! Please enter your password to sign in.`
+        }
+      });
     } catch (err) {
       const msg = err.message || 'Failed to create your account. Please try again.';
       setErrorMessage(msg);
@@ -150,6 +157,19 @@ export default function Signup() {
                   Intelligent Messaging
                 </span>
               </div>
+            </div>
+
+            {/* Switcher Tabs between Sign In and Sign Up */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-xl mb-6 border border-slate-200/70 dark:border-slate-800 text-xs font-semibold">
+              <Link 
+                to="/login" 
+                className="flex-1 py-1.5 px-3 text-center rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+              >
+                Sign In
+              </Link>
+              <span className="flex-1 py-1.5 px-3 text-center rounded-lg bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50">
+                Sign Up
+              </span>
             </div>
 
             <div className="mb-6">

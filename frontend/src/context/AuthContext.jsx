@@ -150,12 +150,8 @@ export function AuthProvider({ children }) {
 
   const register = async (name, email, password) => {
     const res = await api.register({ name, email, password });
-    if (res?.token && res?.user) {
-      localStorage.setItem('smartsend_token', res.token);
-      localStorage.setItem('smartsend_user', JSON.stringify(res.user));
-      setToken(res.token);
-      setUser(res.user);
-    }
+    // Intentionally do not set token or user state here.
+    // Flow requires the user to log in on the Login page after signing up.
     return res;
   };
 

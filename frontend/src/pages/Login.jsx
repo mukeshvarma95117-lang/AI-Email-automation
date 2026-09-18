@@ -1,22 +1,51 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useToast } from '../context/ToastContext';
-import { Sparkles, AlertCircle, Sun, Moon, Lock, Mail, Eye, EyeOff, ShieldCheck, ArrowRight } from 'lucide-react';
+import { 
+  Sparkles, 
+  AlertCircle, 
+  Sun, 
+  Moon, 
+  Lock, 
+  Mail, 
+  Eye, 
+  EyeOff, 
+  ShieldCheck, 
+  ArrowRight,
+  CheckCircle2 
+} from 'lucide-react';
 
 export default function Login() {
-  const [email, setEmail] = useState('');
+  const location = useLocation();
+  const [email, setEmail] = useState(location.state?.email || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState(location.state?.message || '');
+  const passwordInputRef = useRef(null);
 
   const { login, isAuthenticated } = useAuth();
   const { toggleTheme, isDark } = useTheme();
   const { success, error, info } = useToast();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.email) {
+      setEmail(location.state.email);
+    }
+    if (location.state?.message) {
+      setSuccessMessage(location.state.message);
+    }
+    if (location.state?.justSignedUp) {
+      setTimeout(() => {
+        passwordInputRef.current?.focus();
+      }, 150);
+    }
+  }, [location.state]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -100,6 +129,19 @@ export default function Login() {
               </div>
             </div>
 
+            {/* Switcher Tabs between Sign In and Sign Up */}
+            <div className="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-900/80 rounded-xl mb-6 border border-slate-200/70 dark:border-slate-800 text-xs font-semibold">
+              <span className="flex-1 py-1.5 px-3 text-center rounded-lg bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200/50 dark:border-slate-700/50">
+                Sign In
+              </span>
+              <Link 
+                to="/signup" 
+                className="flex-1 py-1.5 px-3 text-center rounded-lg text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors"
+              >
+                Sign Up
+              </Link>
+            </div>
+
             <div className="mb-6">
               <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-[#1c1e21] dark:text-white">
                 Workspace Sign In
@@ -108,6 +150,14 @@ export default function Login() {
                 Enter your credentials to access your account.
               </p>
             </div>
+
+            {/* Success Message Alert (after registration) */}
+            {successMessage && (
+              <div className="mb-5 p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2.5 shadow-sm animate-in fade-in">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <p className="font-semibold">{successMessage}</p>
+              </div>
+            )}
 
             {/* Error Message Alert */}
             {errorMessage && (
@@ -144,6 +194,7 @@ export default function Login() {
                 </label>
                 <div className="relative">
                   <input
+                    ref={passwordInputRef}
                     type={showPassword ? 'text' : 'password'}
                     required
                     placeholder="••••••••"
