@@ -19,7 +19,9 @@ import {
 
 export default function Login() {
   const location = useLocation();
-  const [email, setEmail] = useState(location.state?.email || '');
+  const [email, setEmail] = useState(() => {
+    return location.state?.email || (typeof window !== 'undefined' ? localStorage.getItem('smartsend_remembered_email') || '' : '');
+  });
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
@@ -65,7 +67,7 @@ export default function Login() {
     }
 
     try {
-      await login(email.trim(), password);
+      await login(email.trim(), password, rememberMe);
       success('Welcome back! Signed into SmartSend AI workspace.');
       navigate('/');
     } catch (err) {

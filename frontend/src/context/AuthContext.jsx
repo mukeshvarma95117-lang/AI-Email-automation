@@ -5,16 +5,19 @@ import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  // Purge any legacy demo or mock tokens from previous app versions
+  // Ensure fresh browser opens always show the Login page first
   const cleanInitialSession = () => {
     try {
-      const savedToken = localStorage.getItem('smartsend_token');
-      if (savedToken && (savedToken.startsWith('demo-') || savedToken.startsWith('mock-'))) {
-        localStorage.removeItem('smartsend_token');
-        localStorage.removeItem('smartsend_user');
-        return null;
+      // Clear persistent tokens from localStorage so fresh website visits always show login page
+      localStorage.removeItem('smartsend_token');
+      localStorage.removeItem('smartsend_user');
+
+      // Check if there is an active in-session token for this specific browser tab
+      const sessionToken = sessionStorage.getItem('smartsend_token');
+      if (sessionToken && !sessionToken.startsWith('demo-') && !sessionToken.startsWith('mock-')) {
+        return sessionToken;
       }
-      return savedToken || null;
+      return null;
     } catch {
       return null;
     }
@@ -23,27 +26,46 @@ export function AuthProvider({ children }) {
   const [token, setToken] = useState(() => cleanInitialSession());
   const [user, setUser] = useState(() => {
     try {
-      const savedToken = localStorage.getItem('smartsend_token');
-      if (!savedToken || savedToken.startsWith('demo-') || savedToken.startsWith('mock-')) {
+      const sessionToken = sessionStorage.getItem('smartsend_token');
+      if (!sessionToken || sessionToken.startsWith('demo-') || sessionToken.startsWith('mock-')) {
         return null;
       }
-      const savedUser = localStorage.getItem('smartsend_user');
-      return savedUser ? JSON.parse(savedUser) : null;
+      const sessionUser = sessionStorage.getItem('smartsend_user');
+      return sessionUser ? JSON.parse(sessionUser) : null;
     } catch {
       return null;
     }
   });
 
-  const [loading, setLoading] = useState(true);
+  // If there is no active token in this session, loading is false immediately (zero delay showing login page)
+  const [loading, setLoading] = useState(() => {
+    try {
+      return Boolean(sessionStorage.getItem('smartsend_token'));
+    } catch {
+      return false;
+    }
+  });
 
   useEffect(() => {
     let mounted = true;
 
     async function initAuth() {
-      // Strictly verify authentication with Supabase
+      const currentSessionToken = sessionStorage.getItem('smartsend_token');
+
+      // If no active session token exists in this tab, enforce logged-out state immediately
+      if (!currentSessionToken) {
+        if (mounted) {
+          setToken(null);
+          setUser(null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Verify active session with Supabase if configured
       if (isSupabaseConfigured) {
         try {
-          const { data: { session }, error } = await supabase.auth.getSession();
+          const { data: { session } } = await supabase.auth.getSession();
           if (session?.user && session?.access_token && mounted) {
             const meta = session.user.user_metadata || {};
             const isDefaultAdmin = (session.user.email || '').toLowerCase() === 'admin@smartsendai.online';
@@ -60,8 +82,8 @@ export function AuthProvider({ children }) {
             };
             setToken(session.access_token);
             setUser(activeUser);
-            localStorage.setItem('smartsend_token', session.access_token);
-            localStorage.setItem('smartsend_user', JSON.stringify(activeUser));
+            sessionStorage.setItem('smartsend_token', session.access_token);
+            sessionStorage.setItem('smartsend_user', JSON.stringify(activeUser));
             setLoading(false);
             return;
           }
@@ -70,15 +92,13 @@ export function AuthProvider({ children }) {
         }
       }
 
-      // 2. Check for active authenticated user session
-      const existingToken = localStorage.getItem('smartsend_token');
-      const existingUserStr = localStorage.getItem('smartsend_user');
-
-      if (existingToken && !existingToken.startsWith('demo-') && !existingToken.startsWith('mock-') && existingUserStr && mounted) {
+      // Check for active session in sessionStorage
+      const sessionUserStr = sessionStorage.getItem('smartsend_user');
+      if (currentSessionToken && sessionUserStr && mounted) {
         try {
-          const parsedUser = JSON.parse(existingUserStr);
+          const parsedUser = JSON.parse(sessionUserStr);
           if (parsedUser && parsedUser.email) {
-            setToken(existingToken);
+            setToken(currentSessionToken);
             setUser(parsedUser);
             setLoading(false);
             return;
@@ -86,10 +106,9 @@ export function AuthProvider({ children }) {
         } catch (err) {}
       }
 
-      // 3. Outside or unauthenticated visitors: clear and enforce login
       if (mounted) {
-        localStorage.removeItem('smartsend_token');
-        localStorage.removeItem('smartsend_user');
+        sessionStorage.removeItem('smartsend_token');
+        sessionStorage.removeItem('smartsend_user');
         setToken(null);
         setUser(null);
         setLoading(false);
@@ -119,13 +138,13 @@ export function AuthProvider({ children }) {
           };
           setToken(session.access_token);
           setUser(activeUser);
-          localStorage.setItem('smartsend_token', session.access_token);
-          localStorage.setItem('smartsend_user', JSON.stringify(activeUser));
+          sessionStorage.setItem('smartsend_token', session.access_token);
+          sessionStorage.setItem('smartsend_user', JSON.stringify(activeUser));
         } else if (event === 'SIGNED_OUT') {
           setToken(null);
           setUser(null);
-          localStorage.removeItem('smartsend_token');
-          localStorage.removeItem('smartsend_user');
+          sessionStorage.removeItem('smartsend_token');
+          sessionStorage.removeItem('smartsend_user');
         }
       });
       authSubscription = data?.subscription;
@@ -137,11 +156,22 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const login = async (email, password) => {
+  const login = async (email, password, remember = true) => {
     const res = await api.login({ email, password });
     if (res?.token && res?.user) {
-      localStorage.setItem('smartsend_token', res.token);
-      localStorage.setItem('smartsend_user', JSON.stringify(res.user));
+      sessionStorage.setItem('smartsend_token', res.token);
+      sessionStorage.setItem('smartsend_user', JSON.stringify(res.user));
+
+      if (remember) {
+        localStorage.setItem('smartsend_remembered_email', email);
+      } else {
+        localStorage.removeItem('smartsend_remembered_email');
+      }
+
+      // Purge any persistent tokens from localStorage
+      localStorage.removeItem('smartsend_token');
+      localStorage.removeItem('smartsend_user');
+
       setToken(res.token);
       setUser(res.user);
     }
@@ -159,11 +189,11 @@ export function AuthProvider({ children }) {
     const res = await api.updateProfile(profileData);
     if (res?.user) {
       setUser(res.user);
-      localStorage.setItem('smartsend_user', JSON.stringify(res.user));
+      sessionStorage.setItem('smartsend_user', JSON.stringify(res.user));
     } else {
       setUser(prev => {
         const next = { ...prev, ...profileData };
-        localStorage.setItem('smartsend_user', JSON.stringify(next));
+        sessionStorage.setItem('smartsend_user', JSON.stringify(next));
         return next;
       });
     }
@@ -176,6 +206,8 @@ export function AuthProvider({ children }) {
         await supabase.auth.signOut();
       } catch (e) {}
     }
+    sessionStorage.removeItem('smartsend_token');
+    sessionStorage.removeItem('smartsend_user');
     localStorage.removeItem('smartsend_token');
     localStorage.removeItem('smartsend_user');
     setToken(null);

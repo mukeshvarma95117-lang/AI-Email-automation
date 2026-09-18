@@ -416,7 +416,9 @@ export async function request(endpoint, options = {}) {
     return handleMockFallback(endpoint, options);
   }
 
-  const token = localStorage.getItem('smartsend_token');
+  const token = typeof window !== 'undefined' 
+    ? (sessionStorage.getItem('smartsend_token') || localStorage.getItem('smartsend_token'))
+    : null;
   const headers = {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
@@ -437,7 +439,9 @@ export async function request(endpoint, options = {}) {
 
     if (response.status === 401) {
       const isDemoToken = token && token.startsWith('demo-');
-      if (!isDemoToken && !window.location.pathname.includes('/login')) {
+      if (!isDemoToken && typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+        sessionStorage.removeItem('smartsend_token');
+        sessionStorage.removeItem('smartsend_user');
         localStorage.removeItem('smartsend_token');
         localStorage.removeItem('smartsend_user');
         window.location.href = '/login';
@@ -496,8 +500,10 @@ export const api = {
             company: meta.company || 'SmartSend AI',
             avatar_url: meta.avatar_url || ''
           };
-          localStorage.setItem('smartsend_token', data.session.access_token);
-          localStorage.setItem('smartsend_user', JSON.stringify(user));
+          sessionStorage.setItem('smartsend_token', data.session.access_token);
+          sessionStorage.setItem('smartsend_user', JSON.stringify(user));
+          localStorage.removeItem('smartsend_token');
+          localStorage.removeItem('smartsend_user');
           return {
             success: true,
             token: data.session.access_token,
@@ -519,8 +525,10 @@ export const api = {
       if (resp.ok) {
         const bData = await resp.json();
         if (bData.token && bData.user) {
-          localStorage.setItem('smartsend_token', bData.token);
-          localStorage.setItem('smartsend_user', JSON.stringify(bData.user));
+          sessionStorage.setItem('smartsend_token', bData.token);
+          sessionStorage.setItem('smartsend_user', JSON.stringify(bData.user));
+          localStorage.removeItem('smartsend_token');
+          localStorage.removeItem('smartsend_user');
           return {
             success: true,
             token: bData.token,
@@ -544,8 +552,10 @@ export const api = {
         avatar_url: ''
       };
       const token = 'smartsend_sec_' + btoa('admin@smartsendai.online:' + Date.now());
-      localStorage.setItem('smartsend_token', token);
-      localStorage.setItem('smartsend_user', JSON.stringify(user));
+      sessionStorage.setItem('smartsend_token', token);
+      sessionStorage.setItem('smartsend_user', JSON.stringify(user));
+      localStorage.removeItem('smartsend_token');
+      localStorage.removeItem('smartsend_user');
       return {
         success: true,
         token,
@@ -563,8 +573,10 @@ export const api = {
           const safeUser = { ...found };
           delete safeUser.password;
           const token = 'smartsend_usr_' + btoa(cleanEmail + ':' + Date.now());
-          localStorage.setItem('smartsend_token', token);
-          localStorage.setItem('smartsend_user', JSON.stringify(safeUser));
+          sessionStorage.setItem('smartsend_token', token);
+          sessionStorage.setItem('smartsend_user', JSON.stringify(safeUser));
+          localStorage.removeItem('smartsend_token');
+          localStorage.removeItem('smartsend_user');
           return {
             success: true,
             token,

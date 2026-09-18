@@ -107,7 +107,7 @@ export default function Contacts() {
 
   const handleExportCsv = async () => {
     try {
-      const token = localStorage.getItem('smartsend_token');
+      const token = sessionStorage.getItem('smartsend_token') || localStorage.getItem('smartsend_token');
       let csvData = null;
 
       try {
